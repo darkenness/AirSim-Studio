@@ -74,7 +74,7 @@ contam-next/
 - ✅ Phase 0: Build system + project setup
 - ✅ Phase 1: Steady-state airflow solver (23/23 tests pass)
 - ✅ Phase 2: Minimum viable GUI + frontend-backend integration
-- ⬜ Phase 3: Transient contaminant transport
+- ✅ Phase 3: Transient contaminant transport (34/34 tests, ECharts visualization)
 - ⬜ Phase 4: Full flow element library + HVAC + HDF5
 - ⬜ Phase 5: Control systems + advanced models
 - ⬜ Phase 6: Python API + release
