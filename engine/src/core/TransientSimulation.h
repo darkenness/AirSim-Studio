@@ -4,6 +4,9 @@
 #include "ContaminantSolver.h"
 #include "Species.h"
 #include "Schedule.h"
+#include "control/Sensor.h"
+#include "control/Controller.h"
+#include "control/Actuator.h"
 #include <vector>
 #include <map>
 #include <functional>
@@ -44,6 +47,11 @@ public:
     void setSources(const std::vector<Source>& sources) { sources_ = sources; }
     void setSchedules(const std::map<int, Schedule>& schedules) { schedules_ = schedules; }
 
+    // Control system
+    void setSensors(const std::vector<Sensor>& sensors) { sensors_ = sensors; }
+    void setControllers(const std::vector<Controller>& controllers) { controllers_ = controllers; }
+    void setActuators(const std::vector<Actuator>& actuators) { actuators_ = actuators; }
+
     // Optional progress callback: (currentTime, endTime) -> bool (return false to cancel)
     using ProgressCallback = std::function<bool(double, double)>;
     void setProgressCallback(ProgressCallback cb) { progressCb_ = cb; }
@@ -56,7 +64,15 @@ private:
     std::vector<Species> species_;
     std::vector<Source> sources_;
     std::map<int, Schedule> schedules_;
+    std::vector<Sensor> sensors_;
+    std::vector<Controller> controllers_;
+    std::vector<Actuator> actuators_;
     ProgressCallback progressCb_;
+
+    // Control system helpers
+    void updateSensors(const Network& network, const ContaminantSolver& contSolver);
+    void updateControllers(double dt);
+    void applyActuators(Network& network);
 };
 
 } // namespace contam

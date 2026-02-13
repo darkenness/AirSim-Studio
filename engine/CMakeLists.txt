@@ -106,6 +106,7 @@ add_executable(contam_tests
     test/test_json.cpp
     test/test_contaminant.cpp
     test/test_elements.cpp
+    test/test_control.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE
