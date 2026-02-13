@@ -43,7 +43,24 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 
+# HighFive (header-only HDF5 C++ wrapper) - optional
+option(CONTAM_ENABLE_HDF5 "Enable HDF5 output support" OFF)
+
 FetchContent_MakeAvailable(eigen json googletest pybind11)
+
+if(CONTAM_ENABLE_HDF5)
+    find_package(HDF5 REQUIRED COMPONENTS C)
+    FetchContent_Declare(
+        highfive
+        GIT_REPOSITORY https://github.com/BlueBrain/HighFive.git
+        GIT_TAG        v2.9.0
+        GIT_SHALLOW    TRUE
+    )
+    set(HIGHFIVE_USE_EIGEN OFF CACHE BOOL "" FORCE)
+    set(HIGHFIVE_UNIT_TESTS OFF CACHE BOOL "" FORCE)
+    set(HIGHFIVE_EXAMPLES OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(highfive)
+endif()
 
 # ── Engine Library ─────────────────────────────────────────────────────
 set(ENGINE_SOURCES
