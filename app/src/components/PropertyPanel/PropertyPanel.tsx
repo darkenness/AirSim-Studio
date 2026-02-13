@@ -112,6 +112,7 @@ function LinkProperties() {
                 PowerLawOrifice: { type: 'PowerLawOrifice', C: 0.001, n: 0.65 },
                 TwoWayFlow: { type: 'TwoWayFlow', Cd: 0.65, area: 0.5 },
                 Fan: { type: 'Fan', maxFlow: 0.05, shutoffPressure: 200 },
+                Duct: { type: 'Duct', length: 5.0, diameter: 0.2, roughness: 0.0001, sumK: 0 },
               };
               updateLink(link.id, { element: defaults[newType] ?? { type: newType } });
             }}
@@ -120,6 +121,7 @@ function LinkProperties() {
             <option value="PowerLawOrifice">幂律孔口模型</option>
             <option value="TwoWayFlow">大开口 (双向流)</option>
             <option value="Fan">风扇 / 风机</option>
+            <option value="Duct">风管 / 管道</option>
           </select>
         </label>
 
@@ -169,6 +171,35 @@ function LinkProperties() {
               label="全压截止" value={link.element.shutoffPressure ?? 200} unit="Pa" type="number" step="10"
               onChange={(v) => updateLink(link.id, {
                 element: { ...link.element, shutoffPressure: Math.max(1, parseFloat(v) || 200) }
+              })}
+            />
+          </>
+        )}
+
+        {link.element.type === 'Duct' && (
+          <>
+            <InputField
+              label="管道长度" value={link.element.length ?? 5} unit="m" type="number" step="0.5"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, length: Math.max(0.1, parseFloat(v) || 5) }
+              })}
+            />
+            <InputField
+              label="水力直径" value={link.element.diameter ?? 0.2} unit="m" type="number" step="0.01"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, diameter: Math.max(0.01, parseFloat(v) || 0.2) }
+              })}
+            />
+            <InputField
+              label="表面粗糙度" value={link.element.roughness ?? 0.0001} unit="m" type="number" step="0.00001"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, roughness: Math.max(0, parseFloat(v) || 0.0001) }
+              })}
+            />
+            <InputField
+              label="局部损失 (ΣK)" value={link.element.sumK ?? 0} type="number" step="0.5"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, sumK: Math.max(0, parseFloat(v) || 0) }
               })}
             />
           </>

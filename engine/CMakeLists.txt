@@ -48,6 +48,7 @@ set(ENGINE_SOURCES
     src/elements/PowerLawOrifice.cpp
     src/elements/Fan.cpp
     src/elements/TwoWayFlow.cpp
+    src/elements/Duct.cpp
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
     src/utils/Constants.cpp

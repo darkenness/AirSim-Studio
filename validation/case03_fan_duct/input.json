@@ -1,0 +1,112 @@
+{
+    "description": "Case 03: Fan-driven ventilation with duct exhaust and CO2 source",
+    "ambient": {
+        "temperature": 283.15,
+        "pressure": 0.0,
+        "windSpeed": 0.0,
+        "windDirection": 0.0
+    },
+    "flowElements": {
+        "supply_fan": {
+            "type": "Fan",
+            "maxFlow": 0.05,
+            "shutoffPressure": 200
+        },
+        "exhaust_duct": {
+            "type": "Duct",
+            "length": 4.0,
+            "diameter": 0.15,
+            "roughness": 0.0001,
+            "sumK": 2.0
+        },
+        "door": {
+            "type": "TwoWayFlow",
+            "Cd": 0.65,
+            "area": 0.02
+        },
+        "crack": {
+            "type": "PowerLawOrifice",
+            "C": 0.001,
+            "n": 0.65
+        }
+    },
+    "nodes": [
+        {
+            "id": 0,
+            "name": "Outdoor",
+            "type": "ambient",
+            "temperature": 283.15
+        },
+        {
+            "id": 1,
+            "name": "Office",
+            "type": "normal",
+            "temperature": 293.15,
+            "elevation": 0.0,
+            "volume": 60.0
+        },
+        {
+            "id": 2,
+            "name": "Corridor",
+            "type": "normal",
+            "temperature": 291.15,
+            "elevation": 0.0,
+            "volume": 40.0
+        }
+    ],
+    "links": [
+        {
+            "id": 1,
+            "from": 0,
+            "to": 1,
+            "elevation": 2.5,
+            "element": "supply_fan"
+        },
+        {
+            "id": 2,
+            "from": 1,
+            "to": 2,
+            "elevation": 1.0,
+            "element": "door"
+        },
+        {
+            "id": 3,
+            "from": 2,
+            "to": 0,
+            "elevation": 2.5,
+            "element": "exhaust_duct"
+        },
+        {
+            "id": 4,
+            "from": 1,
+            "to": 0,
+            "elevation": 0.5,
+            "element": "crack"
+        }
+    ],
+    "species": [
+        {
+            "id": 0,
+            "name": "CO2",
+            "molarMass": 0.044,
+            "decayRate": 0.0,
+            "outdoorConcentration": 7.2e-4
+        }
+    ],
+    "sources": [
+        {
+            "zoneId": 1,
+            "speciesId": 0,
+            "generationRate": 8e-6,
+            "removalRate": 0.0,
+            "scheduleId": -1
+        }
+    ],
+    "schedules": [],
+    "transient": {
+        "startTime": 0.0,
+        "endTime": 3600.0,
+        "timeStep": 30.0,
+        "outputInterval": 60.0
+    }
+}

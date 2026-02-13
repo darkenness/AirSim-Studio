@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "elements/Fan.h"
 #include "elements/TwoWayFlow.h"
+#include "elements/Duct.h"
 #include "elements/PowerLawOrifice.h"
 #include "core/Network.h"
 #include "core/Solver.h"
@@ -209,4 +210,113 @@ TEST(TwoWayFlowIntegrationTest, LargeOpeningFlow) {
 
     // With temperature difference, should have some pressure in the room
     // (stack effect drives flow)
+}
+
+// ── Duct Tests ───────────────────────────────────────────────────────
+
+TEST(DuctTest, PositivePressurePositiveFlow) {
+    Duct duct(5.0, 0.2);  // 5m long, 200mm diameter
+    double density = 1.2;
+    auto result = duct.calculate(50.0, density);
+    EXPECT_GT(result.massFlow, 0.0);
+}
+
+TEST(DuctTest, NegativePressureNegativeFlow) {
+    Duct duct(5.0, 0.2);
+    auto result = duct.calculate(-50.0, 1.2);
+    EXPECT_LT(result.massFlow, 0.0);
+}
+
+TEST(DuctTest, Antisymmetry) {
+    Duct duct(5.0, 0.2);
+    auto pos = duct.calculate(50.0, 1.2);
+    auto neg = duct.calculate(-50.0, 1.2);
+    EXPECT_NEAR(pos.massFlow, -neg.massFlow, 1e-6);
+}
+
+TEST(DuctTest, LongerDuctLessFlow) {
+    Duct short_duct(2.0, 0.2);
+    Duct long_duct(10.0, 0.2);
+    auto rShort = short_duct.calculate(50.0, 1.2);
+    auto rLong = long_duct.calculate(50.0, 1.2);
+    EXPECT_GT(rShort.massFlow, rLong.massFlow);
+}
+
+TEST(DuctTest, LargerDiameterMoreFlow) {
+    Duct small(5.0, 0.1);
+    Duct large(5.0, 0.3);
+    auto rSmall = small.calculate(50.0, 1.2);
+    auto rLarge = large.calculate(50.0, 1.2);
+    EXPECT_GT(rLarge.massFlow, rSmall.massFlow);
+}
+
+TEST(DuctTest, ZeroPressureLinearization) {
+    Duct duct(5.0, 0.2);
+    auto result = duct.calculate(0.0, 1.2);
+    EXPECT_NEAR(result.massFlow, 0.0, 1e-10);
+    EXPECT_GT(result.derivative, 0.0);
+}
+
+TEST(DuctTest, DerivativePositive) {
+    Duct duct(5.0, 0.2);
+    auto result = duct.calculate(50.0, 1.2);
+    EXPECT_GT(result.derivative, 0.0);
+}
+
+TEST(DuctTest, MinorLossesReduceFlow) {
+    Duct noMinor(5.0, 0.2, 0.0001, 0.0);
+    Duct withMinor(5.0, 0.2, 0.0001, 10.0);  // sumK=10
+    auto r1 = noMinor.calculate(50.0, 1.2);
+    auto r2 = withMinor.calculate(50.0, 1.2);
+    EXPECT_GT(r1.massFlow, r2.massFlow);
+}
+
+TEST(DuctTest, InvalidParameters) {
+    EXPECT_THROW(Duct(0.0, 0.2), std::invalid_argument);
+    EXPECT_THROW(Duct(5.0, 0.0), std::invalid_argument);
+    EXPECT_THROW(Duct(5.0, 0.2, -0.001), std::invalid_argument);
+}
+
+TEST(DuctTest, Clone) {
+    Duct duct(5.0, 0.2, 0.0001, 2.0);
+    auto cloned = duct.clone();
+    auto r1 = duct.calculate(50.0, 1.2);
+    auto r2 = cloned->calculate(50.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
+}
+
+// ── Integration: Duct in Network ─────────────────────────────────────
+
+TEST(DuctIntegrationTest, DuctWithFanNetwork) {
+    Network net;
+
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(50.0);
+    net.addNode(room);
+
+    // Fan supply duct
+    Link l1(1, 0, 1, 1.5);
+    l1.setFlowElement(std::make_unique<Fan>(0.05, 200.0));
+    net.addLink(std::move(l1));
+
+    // Exhaust duct
+    Link l2(2, 1, 0, 1.5);
+    l2.setFlowElement(std::make_unique<Duct>(3.0, 0.15, 0.0001, 1.5));
+    net.addLink(std::move(l2));
+
+    Solver solver;
+    auto result = solver.solve(net);
+    EXPECT_TRUE(result.converged);
+
+    // Room should be pressurized by fan
+    EXPECT_GT(result.pressures[1], 0.0);
+    // Fan flow into room
+    EXPECT_GT(result.massFlows[0], 0.0);
+    // Duct exhaust flow out of room
+    EXPECT_GT(result.massFlows[1], 0.0);
 }

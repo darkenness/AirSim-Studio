@@ -27,6 +27,10 @@ export interface FlowElementDef {
   area?: number;         // opening area m² (TwoWayFlow)
   maxFlow?: number;      // max volumetric flow m³/s (Fan)
   shutoffPressure?: number; // shutoff pressure Pa (Fan)
+  length?: number;         // duct length m (Duct)
+  diameter?: number;       // hydraulic diameter m (Duct)
+  roughness?: number;      // surface roughness m (Duct)
+  sumK?: number;           // minor loss coefficients (Duct)
 }
 
 // ── Link (Airflow Path) ──────────────────────────────────────────────

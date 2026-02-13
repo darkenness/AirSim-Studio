@@ -191,6 +191,15 @@ export default function SketchPad() {
               ? (linkResult.massFlow > 0 ? COLORS.flowPositive : COLORS.flowNegative)
               : COLORS.link;
 
+            const elemLabel: Record<string, string> = {
+              PowerLawOrifice: '孔口',
+              TwoWayFlow: '大开口',
+              Fan: '风扇',
+              Duct: '风管',
+              Damper: '阀门',
+            };
+            const typeTag = elemLabel[link.element.type] ?? link.element.type;
+
             return (
               <Group key={`link-${link.id}`}>
                 <Arrow
@@ -203,10 +212,19 @@ export default function SketchPad() {
                   onClick={() => useAppStore.getState().selectLink(link.id)}
                   hitStrokeWidth={12}
                 />
+                <Text
+                  x={(from.x + to.x) / 2 - 20}
+                  y={(from.y + to.y) / 2 + (linkResult ? -22 : -8)}
+                  text={typeTag}
+                  fontSize={9}
+                  fontFamily="Inter, sans-serif"
+                  fill={isSelected ? COLORS.linkSelected : '#94a3b8'}
+                  padding={1}
+                />
                 {linkResult && (
                   <Text
                     x={(from.x + to.x) / 2 - 30}
-                    y={(from.y + to.y) / 2 - 16}
+                    y={(from.y + to.y) / 2 - 10}
                     text={`${(linkResult.massFlow * 1000).toFixed(3)} g/s`}
                     fontSize={9}
                     fontFamily="Inter, sans-serif"
