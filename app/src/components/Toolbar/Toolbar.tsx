@@ -11,41 +11,65 @@ const tools: { mode: ToolMode; icon: React.ReactNode; label: string; tip: string
 ];
 
 export default function Toolbar() {
-  const { toolMode, setToolMode, isRunning, clearAll, exportTopology, setResult, setIsRunning, setError, loadFromJson } = useAppStore();
+  const { toolMode, setToolMode, isRunning, clearAll, exportTopology, setResult, setIsRunning, setError, loadFromJson, species, setTransientResult } = useAppStore();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isTransient = species.length > 0;
 
   const handleRun = async () => {
     setIsRunning(true);
     setError(null);
     setResult(null);
+    setTransientResult(null);
 
     try {
       const topology = exportTopology();
 
-      // In Tauri: call engine via IPC command
-      // In browser dev mode: use mock or fetch API
       if (window.__TAURI_INTERNALS__) {
         const { invoke } = await import('@tauri-apps/api/core');
         const resultJson = await invoke<string>('run_engine', { input: JSON.stringify(topology) });
-        setResult(JSON.parse(resultJson));
+        const parsed = JSON.parse(resultJson);
+        if (parsed.timeSeries) {
+          setTransientResult(parsed);
+        } else {
+          setResult(parsed);
+        }
       } else {
-        // Browser dev mode: mock solve with a simple response
+        // Browser dev mode: mock
         await new Promise((r) => setTimeout(r, 500));
-        setResult({
-          solver: { converged: true, iterations: 0, maxResidual: 0 },
-          nodes: topology.nodes.map((n) => ({
-            id: n.id, name: n.name,
-            pressure: n.type === 'ambient' ? 0 : -0.5 + Math.random(),
-            density: n.temperature ? 101325 / (287.055 * n.temperature) : 1.2,
-            temperature: n.temperature ?? 293.15,
-            elevation: n.elevation ?? 0,
-          })),
-          links: topology.links.map((l) => ({
-            id: l.id, from: l.from, to: l.to,
-            massFlow: (Math.random() - 0.5) * 0.001,
-            volumeFlow_m3s: (Math.random() - 0.5) * 0.001,
-          })),
-        });
+        if (isTransient) {
+          // Mock transient result
+          const numSteps = 10;
+          const timeSeries = Array.from({ length: numSteps }, (_, i) => ({
+            time: i * 60,
+            airflow: { converged: true, iterations: 5, pressures: topology.nodes.map((n) => n.type === 'ambient' ? 0 : -0.3), massFlows: topology.links.map(() => 0.0005) },
+            concentrations: topology.nodes.map((n) =>
+              topology.species?.map((_, si) => n.type === 'ambient' ? (topology.species?.[si]?.outdoorConcentration ?? 0) : i * 1e-5) ?? []
+            ),
+          }));
+          setTransientResult({
+            completed: true,
+            totalSteps: numSteps,
+            species: topology.species?.map((s) => ({ id: s.id, name: s.name, molarMass: s.molarMass })) ?? [],
+            nodes: topology.nodes.map((n) => ({ id: n.id, name: n.name, type: n.type })),
+            timeSeries,
+          });
+        } else {
+          setResult({
+            solver: { converged: true, iterations: 0, maxResidual: 0 },
+            nodes: topology.nodes.map((n) => ({
+              id: n.id, name: n.name,
+              pressure: n.type === 'ambient' ? 0 : -0.5 + Math.random(),
+              density: n.temperature ? 101325 / (287.055 * n.temperature) : 1.2,
+              temperature: n.temperature ?? 293.15,
+              elevation: n.elevation ?? 0,
+            })),
+            links: topology.links.map((l) => ({
+              id: l.id, from: l.from, to: l.to,
+              massFlow: (Math.random() - 0.5) * 0.001,
+              volumeFlow_m3s: (Math.random() - 0.5) * 0.001,
+            })),
+          });
+        }
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
@@ -120,7 +144,7 @@ export default function Toolbar() {
         className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         <Play size={14} fill="currentColor" />
-        {isRunning ? '计算中...' : '运行'}
+        {isRunning ? '计算中...' : (isTransient ? '瞬态仿真' : '稳态求解')}
       </button>
 
       <div className="flex-1" />

@@ -2,6 +2,7 @@ import Toolbar from './components/Toolbar/Toolbar';
 import SketchPad from './components/SketchPad/SketchPad';
 import PropertyPanel from './components/PropertyPanel/PropertyPanel';
 import ResultsView from './components/ResultsView/ResultsView';
+import TransientChart from './components/TransientChart/TransientChart';
 import StatusBar from './components/StatusBar/StatusBar';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <PropertyPanel />
       </div>
       <ResultsView />
+      <TransientChart />
       <StatusBar />
     </div>
   );

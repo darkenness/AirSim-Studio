@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult } from '../types';
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Model data
@@ -16,8 +16,15 @@ export const useAppStore = create<AppState>((set, get) => ({
   toolMode: 'select',
   nextId: 1,
 
+  // Contaminant model
+  species: [],
+  sources: [],
+  schedules: [],
+  transientConfig: { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
+
   // Simulation
   result: null,
+  transientResult: null,
   isRunning: false,
   error: null,
 
@@ -82,6 +89,27 @@ export const useAppStore = create<AppState>((set, get) => ({
   setIsRunning: (running) => set({ isRunning: running }),
   setError: (error) => set({ error }),
 
+  addSpecies: (sp: Species) => set((state) => ({ species: [...state.species, sp] })),
+  removeSpecies: (id: number) => set((state) => ({
+    species: state.species.filter((s) => s.id !== id),
+    sources: state.sources.filter((s) => s.speciesId !== id),
+  })),
+  updateSpecies: (id: number, updates) => set((state) => ({
+    species: state.species.map((s) => (s.id === id ? { ...s, ...updates } : s)),
+  })),
+  addSource: (src: Source) => set((state) => ({ sources: [...state.sources, src] })),
+  removeSource: (idx: number) => set((state) => ({
+    sources: state.sources.filter((_, i) => i !== idx),
+  })),
+  updateSource: (idx: number, updates) => set((state) => ({
+    sources: state.sources.map((s, i) => (i === idx ? { ...s, ...updates } : s)),
+  })),
+  addSchedule: (sch: Schedule) => set((state) => ({ schedules: [...state.schedules, sch] })),
+  setTransientConfig: (config) => set((state) => ({
+    transientConfig: { ...state.transientConfig, ...config },
+  })),
+  setTransientResult: (result: TransientResult | null) => set({ transientResult: result }),
+
   exportTopology: (): TopologyJson => {
     const state = get();
     const ambientNodes = state.nodes.filter((n) => n.type === 'ambient');
@@ -111,6 +139,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         elevation: l.elevation,
         element: l.element,
       })),
+      species: state.species.length > 0 ? state.species : undefined,
+      sources: state.sources.length > 0 ? state.sources : undefined,
+      schedules: state.schedules.length > 0 ? state.schedules : undefined,
+      transient: state.species.length > 0 ? state.transientConfig : undefined,
     };
   },
 
@@ -162,7 +194,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       windDirection: json.ambient?.windDirection ?? 0,
       selectedNodeId: null,
       selectedLinkId: null,
+      species: json.species ?? [],
+      sources: json.sources ?? [],
+      schedules: json.schedules ?? [],
+      transientConfig: json.transient ?? { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
       result: null,
+      transientResult: null,
       error: null,
       nextId: maxId + 1,
     };
@@ -171,9 +208,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearAll: () => set({
     nodes: [],
     links: [],
+    species: [],
+    sources: [],
+    schedules: [],
     selectedNodeId: null,
     selectedLinkId: null,
     result: null,
+    transientResult: null,
     error: null,
     nextId: 1,
   }),

@@ -67,6 +67,56 @@ export interface SimulationResult {
   links: LinkResult[];
 }
 
+// ── Species / Source / Schedule ──────────────────────────────────────
+export interface Species {
+  id: number;
+  name: string;
+  molarMass: number;
+  decayRate: number;
+  outdoorConcentration: number;
+}
+
+export interface Source {
+  zoneId: number;
+  speciesId: number;
+  generationRate: number;
+  removalRate: number;
+  scheduleId: number;
+}
+
+export interface SchedulePoint {
+  time: number;
+  value: number;
+}
+
+export interface Schedule {
+  id: number;
+  name: string;
+  points: SchedulePoint[];
+}
+
+export interface TransientConfig {
+  startTime: number;
+  endTime: number;
+  timeStep: number;
+  outputInterval: number;
+}
+
+// ── Transient Result ────────────────────────────────────────────────
+export interface TransientTimeStep {
+  time: number;
+  airflow: { converged: boolean; iterations: number; pressures: number[]; massFlows: number[] };
+  concentrations: number[][];  // [nodeIdx][speciesIdx]
+}
+
+export interface TransientResult {
+  completed: boolean;
+  totalSteps: number;
+  species: { id: number; name: string; molarMass: number }[];
+  nodes: { id: number; name: string; type: string }[];
+  timeSeries: TransientTimeStep[];
+}
+
 // ── Topology JSON (matches engine schema) ────────────────────────────
 export interface TopologyJson {
   description?: string;
@@ -93,6 +143,10 @@ export interface TopologyJson {
     elevation?: number;
     element: string | FlowElementDef;
   }>;
+  species?: Species[];
+  sources?: Source[];
+  schedules?: Schedule[];
+  transient?: TransientConfig;
 }
 
 // ── UI State ─────────────────────────────────────────────────────────
@@ -113,8 +167,15 @@ export interface AppState {
   toolMode: ToolMode;
   nextId: number;
 
+  // Contaminant model
+  species: Species[];
+  sources: Source[];
+  schedules: Schedule[];
+  transientConfig: TransientConfig;
+
   // Simulation
   result: SimulationResult | null;
+  transientResult: TransientResult | null;
   isRunning: boolean;
   error: string | null;
 
@@ -132,6 +193,15 @@ export interface AppState {
   setResult: (result: SimulationResult | null) => void;
   setIsRunning: (running: boolean) => void;
   setError: (error: string | null) => void;
+  addSpecies: (sp: Species) => void;
+  removeSpecies: (id: number) => void;
+  updateSpecies: (id: number, updates: Partial<Species>) => void;
+  addSource: (src: Source) => void;
+  removeSource: (idx: number) => void;
+  updateSource: (idx: number, updates: Partial<Source>) => void;
+  addSchedule: (sch: Schedule) => void;
+  setTransientConfig: (config: Partial<TransientConfig>) => void;
+  setTransientResult: (result: TransientResult | null) => void;
   exportTopology: () => TopologyJson;
   loadFromJson: (json: TopologyJson) => void;
   clearAll: () => void;
