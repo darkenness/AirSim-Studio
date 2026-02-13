@@ -57,8 +57,16 @@ export default function StatusBar() {
     return () => window.removeEventListener('keydown', handler);
   }, [selectedNodeId, selectedLinkId, setToolMode, selectNode, selectLink, removeNode, removeLink]);
 
+  const { species } = useAppStore();
   const roomCount = nodes.filter((n) => n.type === 'normal').length;
   const ambientCount = nodes.filter((n) => n.type === 'ambient').length;
+
+  const elemLabels: Record<string, string> = {
+    PowerLawOrifice: '孔口', TwoWayFlow: '大开口', Fan: '风扇', Duct: '风管', Damper: '阀门',
+  };
+  const elemCounts: Record<string, number> = {};
+  links.forEach((l) => { elemCounts[l.element.type] = (elemCounts[l.element.type] || 0) + 1; });
+  const elemSummary = Object.entries(elemCounts).map(([t, c]) => `${elemLabels[t] ?? t}×${c}`).join(' ');
 
   return (
     <footer className="h-7 bg-slate-50 border-t border-slate-200 flex items-center px-3 gap-4 text-[10px] text-slate-500 shrink-0 select-none">
@@ -67,8 +75,9 @@ export default function StatusBar() {
       </span>
       <div className="w-px h-3.5 bg-slate-200" />
       <span>房间: <strong className="text-slate-700">{roomCount}</strong></span>
-      <span>室外节点: <strong className="text-slate-700">{ambientCount}</strong></span>
-      <span>气流路径: <strong className="text-slate-700">{links.length}</strong></span>
+      <span>室外: <strong className="text-slate-700">{ambientCount}</strong></span>
+      <span>路径: <strong className="text-slate-700">{links.length}</strong>{elemSummary && <span className="text-slate-400 ml-0.5">({elemSummary})</span>}</span>
+      {species.length > 0 && <span>污染物: <strong className="text-purple-600">{species.length}</strong></span>}
 
       {(selectedNodeId !== null || selectedLinkId !== null) && (
         <>

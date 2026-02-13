@@ -2,6 +2,7 @@ import { useAppStore } from '../../store/useAppStore';
 import type { FlowElementType, FlowElementDef } from '../../types';
 import { Trash2, Box, Cloud, Link2 } from 'lucide-react';
 import ContaminantPanel from '../ContaminantPanel/ContaminantPanel';
+import ModelSummary from '../ModelSummary/ModelSummary';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
   label: string; value: string | number; onChange: (v: string) => void; unit?: string; type?: string; step?: string;
@@ -279,6 +280,8 @@ export default function PropertyPanel() {
             <AmbientSettings />
             <div className="border-t border-slate-100 pt-3" />
             <ContaminantPanel />
+            <div className="border-t border-slate-100 pt-3" />
+            <ModelSummary />
             <div className="border-t border-slate-100 pt-3 text-xs text-slate-400 leading-relaxed">
               选择房间或连接以编辑其属性。使用工具栏添加新元素。
             </div>
