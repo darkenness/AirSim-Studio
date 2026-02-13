@@ -43,6 +43,8 @@ set(ENGINE_SOURCES
     src/core/Link.cpp
     src/core/Network.cpp
     src/core/Solver.cpp
+    src/core/ContaminantSolver.cpp
+    src/core/TransientSimulation.cpp
     src/elements/PowerLawOrifice.cpp
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
@@ -72,6 +74,7 @@ add_executable(contam_tests
     test/test_network.cpp
     test/test_solver.cpp
     test/test_json.cpp
+    test/test_contaminant.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE
