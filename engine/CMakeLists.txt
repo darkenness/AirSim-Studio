@@ -83,6 +83,11 @@ set(ENGINE_SOURCES
     src/elements/Filter.cpp
     src/elements/SelfRegulatingVent.cpp
     src/elements/CheckValve.cpp
+    src/elements/QuadraticElement.cpp
+    src/elements/BackdraftDamper.cpp
+    src/elements/SimpleParticleFilter.cpp
+    src/elements/SupplyDiffuser.cpp
+    src/elements/ReturnGrille.cpp
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
     src/utils/Constants.cpp
@@ -115,6 +120,7 @@ add_executable(contam_tests
     test/test_elements.cpp
     test/test_control.cpp
     test/test_advanced.cpp
+    test/test_validation.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE

@@ -18,9 +18,16 @@ double Solver::computeDeltaP(const Network& network, const Link& link) const {
     const auto& nodeJ = network.getNode(link.getNodeTo());
     double Zk = link.getElevation();
 
-    // ΔP_k = (P_j - ρ_j·g·(Z_k - Z_j)) - (P_i - ρ_i·g·(Z_k - Z_i))
-    double pEffI = nodeI.getPressure() - nodeI.getDensity() * GRAVITY * (Zk - nodeI.getElevation());
-    double pEffJ = nodeJ.getPressure() - nodeJ.getDensity() * GRAVITY * (Zk - nodeJ.getElevation());
+    // ΔP_k = (P_i + P_W_i - ρ_i·g·(Z_k - Z_i)) - (P_j + P_W_j - ρ_j·g·(Z_k - Z_j))
+    // Wind pressure P_W only applies to Ambient nodes: P_W = 0.5 * ρ * Cp * V_wind²
+    double windSpeed = network.getWindSpeed();
+
+    double windDir = network.getWindDirection();
+    double pWindI = nodeI.isKnownPressure() ? nodeI.getWindPressure(windSpeed, windDir) : 0.0;
+    double pWindJ = nodeJ.isKnownPressure() ? nodeJ.getWindPressure(windSpeed, windDir) : 0.0;
+
+    double pEffI = nodeI.getPressure() + pWindI - nodeI.getDensity() * GRAVITY * (Zk - nodeI.getElevation());
+    double pEffJ = nodeJ.getPressure() + pWindJ - nodeJ.getDensity() * GRAVITY * (Zk - nodeJ.getElevation());
 
     // Convention: positive ΔP drives flow from nodeI to nodeJ
     return pEffI - pEffJ;

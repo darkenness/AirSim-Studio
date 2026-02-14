@@ -1,15 +1,16 @@
 import { useCanvasStore, type ToolMode } from '../../store/useCanvasStore';
-import { MousePointer2, PenLine, DoorOpen, SquareAsterisk, Eraser } from 'lucide-react';
+import { MousePointer2, PenLine, Square, DoorOpen, SquareAsterisk, Eraser } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { useEffect } from 'react';
 
 const tools: { mode: ToolMode; icon: React.ReactNode; label: string; tip: string; shortcut: string }[] = [
   { mode: 'select', icon: <MousePointer2 size={18} strokeWidth={2.2} />, label: '选择', tip: '选择/移动墙壁和区域', shortcut: '1' },
-  { mode: 'wall', icon: <PenLine size={18} strokeWidth={2.2} />, label: '画墙', tip: '点击两端画墙，围合自动生成房间', shortcut: '2' },
-  { mode: 'door', icon: <DoorOpen size={18} strokeWidth={2.2} />, label: '门', tip: '在墙上放置门/气流路径', shortcut: '3' },
-  { mode: 'window', icon: <SquareAsterisk size={18} strokeWidth={2.2} />, label: '窗', tip: '在墙上放置窗户', shortcut: '4' },
-  { mode: 'erase', icon: <Eraser size={18} strokeWidth={2.2} />, label: '删除', tip: '点击删除墙壁或组件', shortcut: '5' },
+  { mode: 'wall', icon: <PenLine size={18} strokeWidth={2.2} />, label: '画墙', tip: '点击两端画正交墙，围合自动生成房间', shortcut: '2' },
+  { mode: 'rect', icon: <Square size={18} strokeWidth={2.2} />, label: '矩形', tip: '拖拽绘制矩形房间（4面墙）', shortcut: '3' },
+  { mode: 'door', icon: <DoorOpen size={18} strokeWidth={2.2} />, label: '门', tip: '在墙上放置门/气流路径', shortcut: '4' },
+  { mode: 'window', icon: <SquareAsterisk size={18} strokeWidth={2.2} />, label: '窗', tip: '在墙上放置窗户', shortcut: '5' },
+  { mode: 'erase', icon: <Eraser size={18} strokeWidth={2.2} />, label: '删除', tip: '点击删除墙壁或组件', shortcut: '6' },
 ];
 
 export default function VerticalToolbar() {

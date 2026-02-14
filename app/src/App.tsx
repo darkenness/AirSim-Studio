@@ -1,9 +1,8 @@
-import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { TooltipProvider } from './components/ui/tooltip';
 import { Toaster } from './components/ui/toaster';
 import TopBar from './components/TopBar/TopBar';
 import VerticalToolbar from './components/VerticalToolbar/VerticalToolbar';
-import IsometricCanvas from './canvas/IsometricCanvas';
+import Canvas2D from './canvas/Canvas2D';
 import ControlFlowCanvas from './control/ControlFlowCanvas';
 import WelcomePage from './components/WelcomePage/WelcomePage';
 import PropertyPanel from './components/PropertyPanel/PropertyPanel';
@@ -12,8 +11,9 @@ import TransientChart from './components/TransientChart/TransientChart';
 import ExposureReport from './components/ExposureReport/ExposureReport';
 import StatusBar from './components/StatusBar/StatusBar';
 import { useAppStore } from './store/useAppStore';
+import { useCanvasStore } from './store/useCanvasStore';
 import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp, PanelRightOpen, PanelRightClose, Layers, GitBranch } from 'lucide-react';
 import { toast } from './hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 
@@ -80,7 +80,10 @@ function BottomPanel() {
 
 function App() {
   const { loadFromJson } = useAppStore();
+  const sidebarOpen = useCanvasStore(s => s.sidebarOpen);
+  const setSidebarOpen = useCanvasStore(s => s.setSidebarOpen);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [activeView, setActiveView] = useState<'canvas' | 'control'>('canvas');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -108,47 +111,83 @@ function App() {
   return (
     <TooltipProvider>
       <div className="flex flex-col h-screen w-screen bg-background text-foreground" onDragOver={handleDragOver} onDrop={handleDrop}>
-        <TopBar />
         {showWelcome ? (
-          <WelcomePage onStart={() => setShowWelcome(false)} />
+          <>
+            <TopBar />
+            <WelcomePage onStart={() => setShowWelcome(false)} />
+          </>
         ) : (
-          <div className="relative flex flex-1 min-h-0">
+          <div className="relative flex-1 min-h-0 overflow-hidden">
+            {/* Full-screen canvas (z-0) */}
+            {activeView === 'canvas' ? (
+              <Canvas2D />
+            ) : (
+              <ControlFlowCanvas />
+            )}
+
+            {/* Floating TopBar (z-20) */}
+            <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
+              <div className="pointer-events-auto">
+                <TopBar />
+              </div>
+            </div>
+
+            {/* Floating VerticalToolbar (z-20, self-positioned) */}
             <VerticalToolbar />
-            <PanelGroup orientation="horizontal">
-              {/* Center: Canvas + Bottom Results */}
-              <Panel defaultSize={75} minSize={40}>
-                <Tabs defaultValue="canvas" className="flex flex-col h-full">
-                  <div className="flex items-center border-b border-border px-2 shrink-0">
-                    <TabsList className="h-8">
-                      <TabsTrigger value="canvas" className="text-xs">2.5D 画布</TabsTrigger>
-                      <TabsTrigger value="control" className="text-xs">控制网络</TabsTrigger>
-                    </TabsList>
-                  </div>
-                  <TabsContent value="canvas" className="flex-1 min-h-0 mt-0">
-                    <div className="flex flex-col h-full">
-                      <div className="flex-1 min-h-0">
-                        <IsometricCanvas />
-                      </div>
-                      <BottomPanel />
-                    </div>
-                  </TabsContent>
-                  <TabsContent value="control" className="flex-1 min-h-0 mt-0">
-                    <ControlFlowCanvas />
-                  </TabsContent>
-                </Tabs>
-              </Panel>
 
-              {/* Resize Handle */}
-              <PanelResizeHandle className="w-1 bg-border hover:bg-primary/30 transition-colors cursor-col-resize" />
+            {/* Floating view tab switcher (z-20) */}
+            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20">
+              <div className="flex gap-1 p-1 rounded-xl bg-card/80 backdrop-blur-md border border-border shadow-md">
+                <button
+                  onClick={() => setActiveView('canvas')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    activeView === 'canvas' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                >
+                  <Layers size={13} />
+                  2D 画布
+                </button>
+                <button
+                  onClick={() => setActiveView('control')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    activeView === 'control' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
+                  }`}
+                >
+                  <GitBranch size={13} />
+                  控制网络
+                </button>
+              </div>
+            </div>
 
-              {/* Right: Property Panel */}
-              <Panel defaultSize={25} minSize={15} maxSize={40}>
-                <PropertyPanel />
-              </Panel>
-            </PanelGroup>
+            {/* Sidebar toggle button (z-20) */}
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="absolute top-14 right-3 z-20 p-2 rounded-xl bg-card/80 backdrop-blur-md border border-border shadow-md hover:bg-accent transition-colors"
+              title={sidebarOpen ? '关闭侧边栏' : '打开侧边栏'}
+            >
+              {sidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
+            </button>
+
+            {/* Sliding Sidebar (z-30) */}
+            <div
+              className={`absolute top-0 right-0 bottom-0 w-[340px] z-30 bg-card/95 backdrop-blur-xl border-l border-border shadow-xl transition-transform duration-200 ease-out overflow-y-auto ${
+                sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+              }`}
+            >
+              <PropertyPanel />
+            </div>
+
+            {/* Floating BottomBar (z-20) */}
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
+              <BottomPanel />
+            </div>
+
+            {/* StatusBar at very bottom */}
+            <div className="absolute bottom-0 left-0 right-0 z-10">
+              <StatusBar />
+            </div>
           </div>
         )}
-        <StatusBar />
       </div>
       <Toaster />
     </TooltipProvider>

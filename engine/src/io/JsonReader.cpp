@@ -86,6 +86,24 @@ Network JsonReader::readFromString(const std::string& jsonStr) {
                 node.setPressure(jNode["pressure"].get<double>());
             }
 
+            // Wind pressure profile
+            if (jNode.contains("windCp")) {
+                node.setWindPressureCoeff(jNode["windCp"].get<double>());
+            }
+            if (jNode.contains("wallAzimuth")) {
+                node.setWallAzimuth(jNode["wallAzimuth"].get<double>());
+            }
+            if (jNode.contains("terrainFactor")) {
+                node.setTerrainFactor(jNode["terrainFactor"].get<double>());
+            }
+            if (jNode.contains("windPressureProfile")) {
+                std::vector<std::pair<double, double>> profile;
+                for (auto& jp : jNode["windPressureProfile"]) {
+                    profile.emplace_back(jp["angle"].get<double>(), jp["cp"].get<double>());
+                }
+                node.setWindPressureProfile(profile);
+            }
+
             node.updateDensity();
             network.addNode(node);
         }
@@ -125,9 +143,24 @@ Network JsonReader::readFromString(const std::string& jsonStr) {
 
                 std::string elemType = elemDef["type"].get<std::string>();
                 if (elemType == "PowerLawOrifice") {
-                    double C = elemDef["C"].get<double>();
-                    double n = elemDef["n"].get<double>();
-                    link.setFlowElement(std::make_unique<PowerLawOrifice>(C, n));
+                    if (elemDef.contains("leakageArea")) {
+                        // ASHRAE Effective Leakage Area conversion
+                        double ela = elemDef["leakageArea"].get<double>();
+                        double n = elemDef.value("n", 0.65);
+                        double dpRef = elemDef.value("dPref", 4.0);
+                        auto plo = PowerLawOrifice::fromLeakageArea(ela, n, dpRef);
+                        link.setFlowElement(std::make_unique<PowerLawOrifice>(plo));
+                    } else if (elemDef.contains("orificeArea")) {
+                        // Equivalent orifice area conversion
+                        double area = elemDef["orificeArea"].get<double>();
+                        double cd = elemDef.value("Cd", 0.6);
+                        auto plo = PowerLawOrifice::fromOrificeArea(area, cd);
+                        link.setFlowElement(std::make_unique<PowerLawOrifice>(plo));
+                    } else {
+                        double C = elemDef["C"].get<double>();
+                        double n = elemDef["n"].get<double>();
+                        link.setFlowElement(std::make_unique<PowerLawOrifice>(C, n));
+                    }
                 } else if (elemType == "Fan") {
                     if (elemDef.contains("coeffs")) {
                         auto coeffs = elemDef["coeffs"].get<std::vector<double>>();
@@ -205,6 +238,9 @@ ModelInput JsonReader::readModelFromString(const std::string& jsonStr) {
             sp.decayRate = js.value("decayRate", 0.0);
             sp.outdoorConc = js.value("outdoorConcentration", 0.0);
             sp.isTrace = js.value("isTrace", true);
+            sp.diffusionCoeff = js.value("diffusionCoeff", 0.0);
+            sp.meanDiameter = js.value("meanDiameter", 0.0);
+            sp.effectiveDensity = js.value("effectiveDensity", 0.0);
             model.species.push_back(sp);
         }
     }
@@ -248,6 +284,18 @@ ModelInput JsonReader::readModelFromString(const std::string& jsonStr) {
                 }
             }
             model.schedules[id] = sch;
+        }
+    }
+
+    // Parse zone temperature schedules
+    if (j.contains("zoneTemperatureSchedules")) {
+        for (auto& jzt : j["zoneTemperatureSchedules"]) {
+            int nodeId = jzt["nodeId"].get<int>();
+            int schedId = jzt["scheduleId"].get<int>();
+            int nodeIdx = model.network.getNodeIndexById(nodeId);
+            if (nodeIdx >= 0) {
+                model.zoneTemperatureSchedules[nodeIdx] = schedId;
+            }
         }
     }
 

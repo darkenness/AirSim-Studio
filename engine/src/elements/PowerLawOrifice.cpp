@@ -50,4 +50,20 @@ std::unique_ptr<FlowElement> PowerLawOrifice::clone() const {
     return std::make_unique<PowerLawOrifice>(*this);
 }
 
+PowerLawOrifice PowerLawOrifice::fromLeakageArea(double ELA_m2, double n,
+                                                  double dPref, double rhoRef) {
+    // ASHRAE conversion: at reference ΔP, volume flow Q_ref = ELA * sqrt(2*ΔP_ref/ρ_ref)
+    // Power law: Q = C * ΔP^n  →  C = Q_ref / ΔP_ref^n = ELA * sqrt(2/(ρ_ref)) * ΔP_ref^(0.5-n)
+    double C = ELA_m2 * std::sqrt(2.0 / rhoRef) * std::pow(dPref, 0.5 - n);
+    return PowerLawOrifice(C, n);
+}
+
+PowerLawOrifice PowerLawOrifice::fromOrificeArea(double area_m2, double Cd,
+                                                  double rhoRef) {
+    // Sharp-edged orifice: Q = Cd * A * sqrt(2*ΔP/ρ)
+    // Power law form with n=0.5: Q = C * ΔP^0.5 where C = Cd * A * sqrt(2/ρ_ref)
+    double C = Cd * area_m2 * std::sqrt(2.0 / rhoRef);
+    return PowerLawOrifice(C, 0.5);
+}
+
 } // namespace contam

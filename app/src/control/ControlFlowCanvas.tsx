@@ -19,6 +19,7 @@ import { SensorNode } from './nodes/SensorNode';
 import { PIControllerNode } from './nodes/PIControllerNode';
 import { ActuatorNode } from './nodes/ActuatorNode';
 import { MathNode } from './nodes/MathNode';
+import { LogicNode } from './nodes/LogicNode';
 
 // Register custom node types
 const nodeTypes = {
@@ -26,6 +27,7 @@ const nodeTypes = {
   controller: PIControllerNode,
   actuator: ActuatorNode,
   math: MathNode,
+  logic: LogicNode,
 };
 
 // Connection validation: enforce DAG rules

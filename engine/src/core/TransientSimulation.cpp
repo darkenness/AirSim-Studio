@@ -44,6 +44,11 @@ TransientResult TransientSimulation::run(Network& network) {
         // Adjust last step to hit endTime exactly
         double currentDt = std::min(dt, config_.endTime - t);
 
+        // Step 0: Update zone temperatures from schedules
+        if (!zoneTempSchedules_.empty()) {
+            updateZoneTemperatures(network, t + currentDt);
+        }
+
         // Step 1: Update control system (read sensors -> run controllers -> apply actuators)
         if (!controllers_.empty()) {
             updateSensors(network, contSolver);
@@ -206,17 +211,14 @@ void TransientSimulation::updateDensitiesFromConcentrations(
             }
         }
 
-        // Modified gas constant
+        // Modified gas constant for non-trace species mixture
         double R_mix = R_air * (1.0 + sumCorrection);
         double T = network.getNode(i).getTemperature();
         double P_abs = P_ATM + network.getNode(i).getPressure();
         double newDensity = P_abs / (R_mix * T);
 
-        // Directly set density (bypass normal updateDensity which uses pure air)
-        // We access via const_cast since Node doesn't have setDensity
-        // Instead, we'll update temperature slightly to achieve the target density
-        // Actually, let's just use updateDensity with the absolute pressure
-        network.getNode(i).updateDensity(P_abs);
+        // Directly set corrected density (bypass updateDensity which uses pure-air R_AIR)
+        network.getNode(i).setDensity(newDensity);
     }
 }
 
@@ -258,6 +260,20 @@ void TransientSimulation::injectOccupantSources(
     // This is handled by the user adding sources with matching zone IDs
     // Future: auto-generate sources based on occupant breathing rate and zone
     (void)dynamicSources; // placeholder for future implementation
+}
+
+void TransientSimulation::updateZoneTemperatures(Network& network, double t) {
+    for (const auto& [nodeIdx, schedId] : zoneTempSchedules_) {
+        if (nodeIdx < 0 || nodeIdx >= network.getNodeCount()) continue;
+        auto it = schedules_.find(schedId);
+        if (it == schedules_.end()) continue;
+
+        double newTemp = it->second.getValue(t);
+        // Schedule value is in Kelvin (must be > 0)
+        if (newTemp > 0.0) {
+            network.getNode(nodeIdx).setTemperature(newTemp);
+        }
+    }
 }
 
 } // namespace contam

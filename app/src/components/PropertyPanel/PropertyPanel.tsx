@@ -9,7 +9,7 @@ import ScheduleEditor from '../ScheduleEditor/ScheduleEditor';
 import ScheduleGantt from '../ScheduleGantt/ScheduleGantt';
 import ControlPanel from '../ControlPanel/ControlPanel';
 import OccupantPanel from '../OccupantPanel/OccupantPanel';
-import { ZoneProperties, EdgeProperties, StoryProperties } from './ZoneProperties';
+import { ZoneProperties, EdgeProperties, PlacementProperties, StoryProperties } from './ZoneProperties';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
   label: string; value: string | number; onChange: (v: string) => void; unit?: string; type?: string; step?: string;
@@ -382,20 +382,22 @@ export default function PropertyPanel() {
   const { selectedNodeId, selectedLinkId } = useAppStore();
   const selectedFaceId = useCanvasStore(s => s.selectedFaceId);
   const selectedEdgeId = useCanvasStore(s => s.selectedEdgeId);
+  const selectedPlacementId = useCanvasStore(s => s.selectedPlacementId);
 
   const hasOldSelection = selectedNodeId !== null || selectedLinkId !== null;
-  const hasCanvasSelection = selectedFaceId !== null || selectedEdgeId !== null;
+  const hasCanvasSelection = selectedFaceId !== null || selectedEdgeId !== null || selectedPlacementId !== null;
   const hasSelection = hasOldSelection || hasCanvasSelection;
 
   return (
     <aside className="bg-card flex flex-col h-full overflow-hidden">
       {hasSelection ? (
         <div className="flex flex-col h-full">
-          <div className="px-3 py-2.5 border-b border-border">
+          <div className="px-4 py-2.5 border-b border-border">
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">属性</h2>
           </div>
-          <div className="p-3 flex-1 overflow-y-auto">
-            {selectedFaceId !== null ? <ZoneProperties /> :
+          <div className="px-4 py-3 flex-1 overflow-y-auto">
+            {selectedPlacementId !== null ? <PlacementProperties /> :
+             selectedFaceId !== null ? <ZoneProperties /> :
              selectedEdgeId !== null ? <EdgeProperties /> :
              selectedNodeId !== null ? <NodeProperties /> :
              <LinkProperties />}
@@ -403,16 +405,16 @@ export default function PropertyPanel() {
         </div>
       ) : (
         <Tabs defaultValue="model" className="flex flex-col h-full">
-          <div className="px-2 pt-2 border-b border-border shrink-0">
+          <div className="px-3 pt-2 border-b border-border shrink-0">
             <TabsList className="w-full h-8">
-              <TabsTrigger value="model" className="flex-1 text-xs">模型</TabsTrigger>
-              <TabsTrigger value="contam" className="flex-1 text-xs">污染物</TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 text-xs">排程</TabsTrigger>
-              <TabsTrigger value="control" className="flex-1 text-xs">控制</TabsTrigger>
-              <TabsTrigger value="occupant" className="flex-1 text-xs">人员</TabsTrigger>
+              <TabsTrigger value="model" className="flex-1 text-[11px] px-1">模型</TabsTrigger>
+              <TabsTrigger value="contam" className="flex-1 text-[11px] px-1">污染物</TabsTrigger>
+              <TabsTrigger value="schedule" className="flex-1 text-[11px] px-1">排程</TabsTrigger>
+              <TabsTrigger value="control" className="flex-1 text-[11px] px-1">控制</TabsTrigger>
+              <TabsTrigger value="occupant" className="flex-1 text-[11px] px-1">人员</TabsTrigger>
             </TabsList>
           </div>
-          <div className="flex-1 overflow-y-auto p-3">
+          <div className="flex-1 overflow-y-auto px-4 py-3">
             <TabsContent value="model" className="mt-0">
               <div className="flex flex-col gap-4">
                 <StoryProperties />

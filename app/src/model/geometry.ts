@@ -40,6 +40,28 @@ export interface EdgePlacement {
   type: 'door' | 'window' | 'opening' | 'fan' | 'duct' | 'damper' | 'filter' | 'crack' | 'srv' | 'checkValve';
   definitionId?: string;   // reference to flow element definition
   isConfigured: boolean;   // red/black validation state
+
+  // Common parameters (CONTAM-style)
+  relativeElevation?: number;  // m, relative to floor level
+  multiplier?: number;         // number of identical openings
+
+  // PowerLaw parameters (door, window, crack)
+  flowCoefficient?: number;    // C (kg/s/Pa^n)
+  flowExponent?: number;       // n (0.5~1.0)
+
+  // Large opening (opening / TwoWayFlow)
+  dischargeCd?: number;        // discharge coefficient
+  openingArea?: number;        // m²
+
+  // Fan
+  maxFlow?: number;            // m³/s
+  shutoffPressure?: number;    // Pa
+
+  // Damper
+  damperFraction?: number;     // 0~1 open fraction
+
+  // Filter
+  filterEfficiency?: number;   // 0~1 removal efficiency
 }
 
 // ── Story (Floor Level) ──
@@ -160,7 +182,7 @@ export function getPositionOnEdge(geo: Geometry, edge: GeoEdge, alpha: number): 
 /**
  * Find or create a vertex at (x, y), snapping to existing vertex within threshold
  */
-export function findOrCreateVertex(geo: Geometry, x: number, y: number, snapThreshold: number = 0.3): { vertex: GeoVertex; isNew: boolean } {
+export function findOrCreateVertex(geo: Geometry, x: number, y: number, snapThreshold: number = 0.08): { vertex: GeoVertex; isNew: boolean } {
   for (const v of geo.vertices) {
     const dist = Math.sqrt((v.x - x) ** 2 + (v.y - y) ** 2);
     if (dist <= snapThreshold) {

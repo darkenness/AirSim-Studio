@@ -1,0 +1,103 @@
+{
+  "ambient": {
+    "temperature": 273.15,
+    "pressure": 0.0,
+    "windSpeed": 0.0,
+    "windDirection": 0.0
+  },
+  "flowElements": {
+    "exterior_crack": {
+      "type": "PowerLawOrifice",
+      "C": 0.001,
+      "n": 0.65
+    },
+    "floor_leak": {
+      "type": "PowerLawOrifice",
+      "C": 0.0005,
+      "n": 0.65
+    }
+  },
+  "nodes": [
+    {
+      "id": 0,
+      "name": "Ambient",
+      "type": "ambient",
+      "temperature": 273.15,
+      "elevation": 0.0
+    },
+    {
+      "id": 1,
+      "name": "Room0_Ground",
+      "type": "normal",
+      "temperature": 293.15,
+      "elevation": 0.0,
+      "volume": 75.0
+    },
+    {
+      "id": 2,
+      "name": "Room1_Floor1",
+      "type": "normal",
+      "temperature": 293.15,
+      "elevation": 3.0,
+      "volume": 75.0
+    },
+    {
+      "id": 3,
+      "name": "Room2_Floor2",
+      "type": "normal",
+      "temperature": 293.15,
+      "elevation": 6.0,
+      "volume": 75.0
+    }
+  ],
+  "links": [
+    {
+      "id": 0,
+      "from": 0,
+      "to": 1,
+      "elevation": 1.5,
+      "element": "exterior_crack",
+      "comment": "Ambient->Room0 exterior wall crack at mid-height of ground floor"
+    },
+    {
+      "id": 1,
+      "from": 1,
+      "to": 0,
+      "elevation": 1.5,
+      "element": "exterior_crack",
+      "comment": "Room0->Ambient exterior wall crack (opposite side)"
+    },
+    {
+      "id": 2,
+      "from": 1,
+      "to": 2,
+      "elevation": 3.0,
+      "element": "floor_leak",
+      "comment": "Room0->Room1 floor leak at floor level"
+    },
+    {
+      "id": 3,
+      "from": 2,
+      "to": 3,
+      "elevation": 6.0,
+      "element": "floor_leak",
+      "comment": "Room1->Room2 floor leak at floor level"
+    },
+    {
+      "id": 4,
+      "from": 2,
+      "to": 0,
+      "elevation": 4.5,
+      "element": "exterior_crack",
+      "comment": "Room1->Ambient exterior wall crack at mid-height"
+    },
+    {
+      "id": 5,
+      "from": 3,
+      "to": 0,
+      "elevation": 7.5,
+      "element": "exterior_crack",
+      "comment": "Room2->Ambient exterior wall crack at mid-height"
+    }
+  ]
+}

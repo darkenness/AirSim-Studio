@@ -1,17 +1,21 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 
 const SHORTCUTS = [
-  { keys: ['1'], desc: '选择工具' },
-  { keys: ['2'], desc: '添加房间' },
-  { keys: ['3'], desc: '添加室外节点' },
-  { keys: ['4'], desc: '创建连接' },
+  { keys: ['1', 'V'], desc: '选择工具' },
+  { keys: ['2', 'W'], desc: '画墙工具（正交）' },
+  { keys: ['3', 'R'], desc: '矩形房间工具' },
+  { keys: ['4', 'D'], desc: '放置门' },
+  { keys: ['5'], desc: '放置窗' },
+  { keys: ['6', 'E'], desc: '删除工具' },
+  { keys: ['Space'], desc: '临时平移（按住）' },
   { keys: ['Delete'], desc: '删除选中元素' },
-  { keys: ['Escape'], desc: '取消选择' },
+  { keys: ['Escape'], desc: '取消操作 / 关闭侧栏' },
   { keys: ['Ctrl', 'Z'], desc: '撤销' },
   { keys: ['Ctrl', 'Shift', 'Z'], desc: '重做' },
-  { keys: ['滚轮'], desc: '画布缩放' },
-  { keys: ['拖拽'], desc: '画布平移（选择模式下）' },
+  { keys: ['滚轮'], desc: '画布缩放（鼠标中心）' },
+  { keys: ['左键拖拽'], desc: '画布平移（空白区域）' },
   { keys: ['右键'], desc: '上下文菜单' },
+  { keys: ['PageUp/Down'], desc: '切换楼层' },
   { keys: ['?'], desc: '显示此面板' },
 ];
 

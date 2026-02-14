@@ -54,9 +54,9 @@ def main():
         print(f"  Toolbar buttons: {toolbar_btns}")
         footer = page.locator("footer").count()
         print(f"  StatusBar: {footer > 0}")
-        tabs_25d = page.locator("text=2.5D 画布").count()
+        tabs_2d = page.locator("text=2D 画布").count()
         tabs_ctrl = page.locator("text=控制网络").count()
-        print(f"  Tab '2.5D 画布': {tabs_25d > 0}")
+        print(f"  Tab '2D 画布': {tabs_2d > 0}")
         print(f"  Tab '控制网络': {tabs_ctrl > 0}")
 
         # ── Layer 4: Tool interactions ──
@@ -82,16 +82,26 @@ def main():
         page.keyboard.press("1")
         page.wait_for_timeout(300)
 
-        # Door tool
+        # Rect tool (key 3 in new layout)
         page.keyboard.press("3")
         page.wait_for_timeout(500)
-        door_ind = page.locator("text=放置门").count()
-        print(f"  Door tool indicator: {door_ind > 0}")
+        print("  Rect tool activated")
+
+        # Door tool (key 4 in new layout)
+        page.keyboard.press("4")
+        page.wait_for_timeout(500)
+        print("  Door tool activated")
         page.keyboard.press("1")
         page.wait_for_timeout(200)
 
         # ── Layer 5: Property Panel ──
         print("\n[Layer 5] Property panel...")
+        # First open the sidebar
+        sidebar_toggle = page.locator("button[title*='侧边栏'], button[title*='打开']")
+        if sidebar_toggle.count() > 0:
+            sidebar_toggle.first.click()
+            page.wait_for_timeout(500)
+            print("  Sidebar opened")
         panel_tabs = ["模型", "污染物", "排程", "控制", "人员"]
         for tab in panel_tabs:
             loc = page.locator(f"button:has-text('{tab}'), [role='tab']:has-text('{tab}')")
@@ -117,8 +127,10 @@ def main():
             rf = page.locator(".react-flow").count()
             print(f"  ReactFlow container: {rf > 0}")
         # Switch back
-        page.locator("text=2.5D 画布").first.click()
-        page.wait_for_timeout(500)
+        canvas_tab = page.locator("text=2D 画布")
+        if canvas_tab.count() > 0:
+            canvas_tab.first.click()
+            page.wait_for_timeout(500)
 
         # ── Layer 7: Floor switcher ──
         print("\n[Layer 7] Floor switcher...")

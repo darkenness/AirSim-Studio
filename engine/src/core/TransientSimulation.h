@@ -53,6 +53,11 @@ public:
     void setControllers(const std::vector<Controller>& controllers) { controllers_ = controllers; }
     void setActuators(const std::vector<Actuator>& actuators) { actuators_ = actuators; }
 
+    // Zone temperature schedules: maps node index -> schedule ID
+    void setZoneTemperatureSchedules(const std::map<int, int>& zoneToSchedule) {
+        zoneTempSchedules_ = zoneToSchedule;
+    }
+
     // Occupants (exposure tracking + mobile pollution sources)
     void setOccupants(const std::vector<Occupant>& occupants) { occupants_ = occupants; }
 
@@ -72,6 +77,7 @@ private:
     std::vector<Controller> controllers_;
     std::vector<Actuator> actuators_;
     std::vector<Occupant> occupants_;
+    std::map<int, int> zoneTempSchedules_;  // nodeIdx -> scheduleId
     ProgressCallback progressCb_;
 
     // Control system helpers
@@ -82,6 +88,9 @@ private:
     // Non-trace density feedback: update zone densities based on non-trace species concentrations
     bool hasNonTraceSpecies() const;
     void updateDensitiesFromConcentrations(Network& network, const ContaminantSolver& contSolver);
+
+    // Zone temperature schedule update
+    void updateZoneTemperatures(Network& network, double t);
 
     // Occupant exposure + mobile source injection
     void updateOccupantExposure(const ContaminantSolver& contSolver, double t, double dt);

@@ -5,6 +5,7 @@ import ShortcutDialog from '../ShortcutDialog/ShortcutDialog';
 const TOOL_NAMES: Record<string, string> = {
   select: '选择',
   wall: '画墙',
+  rect: '矩形房间',
   door: '放置门',
   window: '放置窗',
   erase: '删除',

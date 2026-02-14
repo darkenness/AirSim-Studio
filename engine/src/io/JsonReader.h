@@ -15,6 +15,7 @@ struct ModelInput {
     std::vector<Species> species;
     std::vector<Source> sources;
     std::map<int, Schedule> schedules;
+    std::map<int, int> zoneTemperatureSchedules;  // nodeIdx -> scheduleId
     TransientConfig transientConfig;
     bool hasTransient = false;
 };

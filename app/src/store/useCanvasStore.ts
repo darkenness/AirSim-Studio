@@ -8,7 +8,7 @@ import {
 } from '../model/geometry';
 
 // ── Tool mode ──
-export type ToolMode = 'select' | 'wall' | 'door' | 'window' | 'erase' | 'pan';
+export type ToolMode = 'select' | 'wall' | 'rect' | 'door' | 'window' | 'erase' | 'pan';
 
 // ── App mode (edit vs results) ──
 export type AppMode = 'edit' | 'results';
@@ -26,7 +26,7 @@ export interface HoverState {
   hoveredEdgeId: string | null;
   hoveredFaceId: string | null;
   hoveredPlacementId: string | null;
-  cursorWorld: { x: number; y: number; z: number } | null;
+  cursorWorld: { x: number; y: number; z?: number } | null;
   cursorGrid: { x: number; y: number } | null;
 }
 
@@ -57,12 +57,12 @@ export interface CanvasState extends SelectionState, HoverState {
   // Wall drawing
   wallPreview: WallPreview;
 
-  // Camera
+  // Camera (2D)
   cameraZoom: number;
-  cameraAngle: number;      // radians around Y axis for orbit
 
-  // Display settings
-  wallOpacity: number;       // 0..1 wall transparency
+  // Sidebar
+  sidebarOpen: boolean;
+  sidebarTab: string;
 
   // Snap feedback
   snapVertexId: string | null;  // currently snapped vertex for visual feedback
@@ -80,7 +80,7 @@ export interface CanvasState extends SelectionState, HoverState {
   // Actions - Hover
   setHoveredEdge: (id: string | null) => void;
   setHoveredFace: (id: string | null) => void;
-  setCursorWorld: (pos: { x: number; y: number; z: number } | null) => void;
+  setCursorWorld: (pos: { x: number; y: number; z?: number } | null) => void;
   setCursorGrid: (pos: { x: number; y: number } | null) => void;
 
   // Actions - Wall drawing
@@ -117,10 +117,12 @@ export interface CanvasState extends SelectionState, HoverState {
 
   // Actions - Camera
   setCameraZoom: (zoom: number) => void;
-  setCameraAngle: (angle: number) => void;
+
+  // Actions - Sidebar
+  setSidebarOpen: (open: boolean) => void;
+  setSidebarTab: (tab: string) => void;
 
   // Actions - Display
-  setWallOpacity: (opacity: number) => void;
   setSnapVertexId: (id: string | null) => void;
 
   // Actions - Background image
@@ -166,19 +168,21 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
   cursorGrid: null,
 
   // Grid
-  gridSize: 1.0,
+  gridSize: 0.1,
   snapToGrid: true,
   showGrid: true,
 
   // Wall preview
   wallPreview: { startX: 0, startY: 0, endX: 0, endY: 0, active: false },
 
-  // Camera
+  // Camera (2D)
   cameraZoom: 50,
-  cameraAngle: Math.PI / 4,  // 45° default isometric
+
+  // Sidebar
+  sidebarOpen: false,
+  sidebarTab: 'model',
 
   // Display
-  wallOpacity: 1.0,
   snapVertexId: null,
 
   // ── Mode actions ──
@@ -476,10 +480,12 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
 
   // ── Camera ──
   setCameraZoom: (zoom) => set({ cameraZoom: zoom }),
-  setCameraAngle: (angle) => set({ cameraAngle: angle }),
+
+  // ── Sidebar ──
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  setSidebarTab: (tab) => set({ sidebarTab: tab }),
 
   // ── Display ──
-  setWallOpacity: (opacity) => set({ wallOpacity: Math.max(0.05, Math.min(1, opacity)) }),
   setSnapVertexId: (id) => set({ snapVertexId: id }),
 
   // ── Background image ──
