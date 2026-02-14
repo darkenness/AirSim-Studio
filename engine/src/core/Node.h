@@ -41,6 +41,14 @@ public:
 
     bool isKnownPressure() const { return type_ == NodeType::Ambient; }
 
+    // Wind pressure support (for ambient/exterior nodes)
+    // Pw = 0.5 * ρ * Cp * V_wind²
+    double getWindPressureCoeff() const { return windCp_; }
+    void setWindPressureCoeff(double cp) { windCp_ = cp; }
+    double getWindPressure(double windSpeed) const {
+        return 0.5 * density_ * windCp_ * windSpeed * windSpeed;
+    }
+
 private:
     int id_ = 0;
     std::string name_;
@@ -51,6 +59,7 @@ private:
     double elevation_ = 0.0;      // m (base elevation of zone)
     double volume_ = 0.0;         // m^3
     double density_ = 0.0;        // kg/m^3 (computed from ideal gas law)
+    double windCp_ = 0.0;          // wind pressure coefficient (dimensionless)
 };
 
 } // namespace contam

@@ -2,6 +2,7 @@
 #include "Network.h"
 #include "Species.h"
 #include "Schedule.h"
+#include "ChemicalKinetics.h"
 #include "Solver.h"
 #include <Eigen/Dense>
 #include <vector>
@@ -29,6 +30,9 @@ public:
 
     // Set schedules
     void setSchedules(const std::map<int, Schedule>& schedules) { schedules_ = schedules; }
+
+    // Set chemical reaction network (inter-species reactions)
+    void setReactionNetwork(const ReactionNetwork& rxnNet) { rxnNetwork_ = rxnNet; }
 
     // Initialize concentration matrix (all zones, all species)
     void initialize(const Network& network);
@@ -58,8 +62,13 @@ private:
     // Get schedule multiplier at time t
     double getScheduleValue(int scheduleId, double t) const;
 
-    // Build and solve the implicit system for one species
+    ReactionNetwork rxnNetwork_;
+
+    // Build and solve the implicit system for one species (no inter-species coupling)
     void solveSpecies(const Network& network, int specIdx, double t, double dt);
+
+    // Coupled multi-species solve (when chemical kinetics are present)
+    void solveCoupled(const Network& network, double t, double dt);
 };
 
 } // namespace contam

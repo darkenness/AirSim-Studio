@@ -44,9 +44,14 @@ ContaminantResult ContaminantSolver::step(const Network& network, double t, doub
         return {t + dt, C_};
     }
 
-    // Solve each species independently (no inter-species reactions for now)
-    for (int k = 0; k < numSpecies_; ++k) {
-        solveSpecies(network, k, t, dt);
+    if (!rxnNetwork_.empty()) {
+        // Coupled multi-species solve with chemical kinetics
+        solveCoupled(network, t, dt);
+    } else {
+        // Solve each species independently
+        for (int k = 0; k < numSpecies_; ++k) {
+            solveSpecies(network, k, t, dt);
+        }
     }
 
     // Update ambient node concentrations to outdoor values
@@ -168,8 +173,18 @@ void ContaminantSolver::solveSpecies(const Network& network, int specIdx, double
 
         double scheduleMult = getScheduleValue(src.scheduleId, t + dt);
 
-        // Generation: G * schedule → RHS
-        b(eq) += src.generationRate * scheduleMult;
+        if (src.type == SourceType::ExponentialDecay) {
+            // S(t) = mult * G0 * exp(-(t - startTime) / tau_c)
+            double elapsed = (t + dt) - src.startTime;
+            if (elapsed >= 0.0 && src.decayTimeConstant > 0.0) {
+                double decayGen = src.multiplier * src.generationRate
+                                  * std::exp(-elapsed / src.decayTimeConstant);
+                b(eq) += decayGen * scheduleMult;
+            }
+        } else {
+            // Constant source: G * schedule → RHS
+            b(eq) += src.generationRate * scheduleMult;
+        }
 
         // Removal sink: -R * C * V → A += R * V (implicit)
         if (src.removalRate > 0.0) {
@@ -186,6 +201,140 @@ void ContaminantSolver::solveSpecies(const Network& network, int specIdx, double
         int eq = unknownMap[i];
         if (eq >= 0) {
             C_[i][specIdx] = std::max(0.0, C_new(eq));
+        }
+    }
+}
+
+void ContaminantSolver::solveCoupled(const Network& network, double t, double dt) {
+    // Build equation index map (only unknown = non-ambient zones)
+    std::vector<int> unknownMap(numZones_, -1);
+    int numUnknown = 0;
+    for (int i = 0; i < numZones_; ++i) {
+        if (!network.getNode(i).isKnownPressure()) {
+            unknownMap[i] = numUnknown++;
+        }
+    }
+    if (numUnknown == 0) return;
+
+    // Block system: N = numUnknown * numSpecies
+    // Variable ordering: [zone0_spec0, zone0_spec1, ..., zone1_spec0, ...]
+    int N = numUnknown * numSpecies_;
+    Eigen::MatrixXd A = Eigen::MatrixXd::Zero(N, N);
+    Eigen::VectorXd b = Eigen::VectorXd::Zero(N);
+
+    auto idx = [&](int zoneEq, int specIdx) { return zoneEq * numSpecies_ + specIdx; };
+
+    // Build reaction rate matrix K[to][from]
+    auto K = rxnNetwork_.buildMatrix(numSpecies_);
+
+    // Diagonal terms: V_i / dt + decay + chemical self-consumption
+    for (int i = 0; i < numZones_; ++i) {
+        int eq = unknownMap[i];
+        if (eq < 0) continue;
+        const auto& node = network.getNode(i);
+        double Vi = std::max(node.getVolume(), 1.0);
+
+        for (int k = 0; k < numSpecies_; ++k) {
+            int row = idx(eq, k);
+            A(row, row) += Vi / dt;
+            b(row) += Vi / dt * C_[i][k];
+
+            // Species decay
+            double lambda = species_[k].decayRate;
+            if (lambda > 0.0) A(row, row) += lambda * Vi;
+
+            // Chemical kinetics: dC_k/dt = Σ_j K[k][j]*C_j
+            // Implicit: for production (off-diagonal): A(row_k, row_j) -= K[k][j]*Vi
+            //           for self-consumption (diagonal): A(row_k, row_k) += |K[k][k]|*Vi
+            for (int j = 0; j < numSpecies_; ++j) {
+                if (std::abs(K[k][j]) < 1e-30) continue;
+                int col = idx(eq, j);
+                if (k == j) {
+                    // Self-reaction (consumption): K[k][k] is typically negative
+                    // Add |K[k][k]|*Vi to diagonal (implicit removal)
+                    if (K[k][k] < 0.0) {
+                        A(row, row) += std::abs(K[k][k]) * Vi;
+                    }
+                } else {
+                    // Inter-species: β→α production
+                    // K[k][j] > 0 means j produces k
+                    A(row, col) -= K[k][j] * Vi;
+                }
+            }
+        }
+    }
+
+    // Flow terms from links (same as single-species but for all species)
+    for (const auto& link : network.getLinks()) {
+        int nodeI = link.getNodeFrom();
+        int nodeJ = link.getNodeTo();
+        double massFlow = link.getMassFlow();
+
+        for (int k = 0; k < numSpecies_; ++k) {
+            if (massFlow > 0.0) {
+                double flowRate = massFlow / network.getNode(nodeI).getDensity();
+                int eqI = unknownMap[nodeI];
+                int eqJ = unknownMap[nodeJ];
+                if (eqI >= 0) A(idx(eqI, k), idx(eqI, k)) += flowRate;
+                if (eqJ >= 0) {
+                    if (eqI >= 0) A(idx(eqJ, k), idx(eqI, k)) -= flowRate;
+                    else b(idx(eqJ, k)) += flowRate * C_[nodeI][k];
+                }
+            } else if (massFlow < 0.0) {
+                double flowRate = -massFlow / network.getNode(nodeJ).getDensity();
+                int eqI = unknownMap[nodeI];
+                int eqJ = unknownMap[nodeJ];
+                if (eqJ >= 0) A(idx(eqJ, k), idx(eqJ, k)) += flowRate;
+                if (eqI >= 0) {
+                    if (eqJ >= 0) A(idx(eqI, k), idx(eqJ, k)) -= flowRate;
+                    else b(idx(eqI, k)) += flowRate * C_[nodeJ][k];
+                }
+            }
+        }
+    }
+
+    // Source/sink terms
+    for (const auto& src : sources_) {
+        int specIdx = -1;
+        for (int k = 0; k < numSpecies_; ++k) {
+            if (species_[k].id == src.speciesId) { specIdx = k; break; }
+        }
+        if (specIdx < 0) continue;
+
+        int zoneIdx = network.getNodeIndexById(src.zoneId);
+        if (zoneIdx < 0) continue;
+        int eq = unknownMap[zoneIdx];
+        if (eq < 0) continue;
+
+        double scheduleMult = getScheduleValue(src.scheduleId, t + dt);
+        int row = idx(eq, specIdx);
+
+        if (src.type == SourceType::ExponentialDecay) {
+            double elapsed = (t + dt) - src.startTime;
+            if (elapsed >= 0.0 && src.decayTimeConstant > 0.0) {
+                b(row) += src.multiplier * src.generationRate
+                          * std::exp(-elapsed / src.decayTimeConstant) * scheduleMult;
+            }
+        } else {
+            b(row) += src.generationRate * scheduleMult;
+        }
+
+        if (src.removalRate > 0.0) {
+            double Vi = network.getNode(zoneIdx).getVolume();
+            A(row, row) += src.removalRate * Vi;
+        }
+    }
+
+    // Solve block system
+    Eigen::VectorXd C_new = A.colPivHouseholderQr().solve(b);
+
+    // Update concentrations
+    for (int i = 0; i < numZones_; ++i) {
+        int eq = unknownMap[i];
+        if (eq >= 0) {
+            for (int k = 0; k < numSpecies_; ++k) {
+                C_[i][k] = std::max(0.0, C_new(idx(eq, k)));
+            }
         }
     }
 }
