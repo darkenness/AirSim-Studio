@@ -3,20 +3,34 @@ import { Plus, Trash2, User, Clock } from 'lucide-react';
 import type { OccupantZoneAssignment } from '../../types';
 
 export default function OccupantPanel() {
-  const { occupants, addOccupant, removeOccupant, updateOccupant, nodes } = useAppStore();
+  const { occupants, addOccupant, removeOccupant, updateOccupant, nodes, species, addSource } = useAppStore();
   const rooms = nodes.filter((n) => n.type === 'normal');
 
   const handleAdd = () => {
     const nextId = occupants.length > 0 ? Math.max(...occupants.map((o) => o.id)) + 1 : 0;
+    const firstRoom = rooms[0]?.id ?? -1;
     addOccupant({
       id: nextId,
       name: `人员 ${nextId}`,
       breathingRate: 1.2e-4,  // ~7.2 L/min typical adult
       co2EmissionRate: 4.7e-6, // ~0.017 m³/h CO2
-      schedule: rooms.length > 0
-        ? [{ startTime: 0, endTime: 86400, zoneId: rooms[0].id }]
+      schedule: firstRoom >= 0
+        ? [{ startTime: 0, endTime: 86400, zoneId: firstRoom }]
         : [],
     });
+
+    // Auto-inject CO₂ source if CO₂ species exists
+    const co2Species = species.find((s) => s.name === 'CO₂' || s.name === 'CO2');
+    if (co2Species && firstRoom >= 0) {
+      addSource({
+        zoneId: firstRoom,
+        speciesId: co2Species.id,
+        generationRate: 4.7e-6, // same as co2EmissionRate
+        removalRate: 0,
+        scheduleId: -1,
+        type: 'Constant',
+      });
+    }
   };
 
   const updateScheduleEntry = (occId: number, idx: number, patch: Partial<OccupantZoneAssignment>) => {

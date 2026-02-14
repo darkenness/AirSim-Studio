@@ -1,5 +1,6 @@
 import { useAppStore } from '../../store/useAppStore';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import ShortcutDialog from '../ShortcutDialog/ShortcutDialog';
 
 const TOOL_NAMES: Record<string, string> = {
   select: '选择',
@@ -23,6 +24,7 @@ export default function StatusBar() {
     selectedNodeId, selectedLinkId, selectNode, selectLink,
     removeNode, removeLink,
   } = useAppStore();
+  const [shortcutOpen, setShortcutOpen] = useState(false);
 
   // Global keyboard shortcuts
   useEffect(() => {
@@ -49,6 +51,7 @@ export default function StatusBar() {
         case '2': setToolMode('addRoom'); break;
         case '3': setToolMode('addAmbient'); break;
         case '4': setToolMode('addLink'); break;
+        case '?': setShortcutOpen(true); break;
         case 'Escape':
           selectNode(null);
           selectLink(null);
@@ -107,6 +110,7 @@ export default function StatusBar() {
       <span className="text-muted-foreground/60">
         {Object.entries(SHORTCUTS).map(([k, v]) => `${k}=${v}`).join('  ')}
       </span>
+      <ShortcutDialog open={shortcutOpen} onClose={() => setShortcutOpen(false)} />
     </footer>
   );
 }
