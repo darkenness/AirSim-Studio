@@ -48,6 +48,7 @@ export interface AirflowLink {
   to: number;        // node ID
   elevation: number; // m
   element: FlowElementDef;
+  scheduleId?: number; // bound schedule ID (-1 or undefined = no schedule)
   // Canvas position for the link icon
   x: number;
   y: number;

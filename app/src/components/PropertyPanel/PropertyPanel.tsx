@@ -305,6 +305,28 @@ function LinkProperties() {
         )}
       </div>
 
+      {/* Schedule binding */}
+      {['Fan', 'Damper', 'Filter', 'SelfRegulatingVent'].includes(link.element.type) && (
+        <div className="border-t border-slate-100 pt-2 mt-1">
+          <label className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold text-slate-500 tracking-wider">绑定排程</span>
+            <select
+              value={link.scheduleId ?? -1}
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                updateLink(link.id, { scheduleId: val === -1 ? undefined : val });
+              }}
+              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            >
+              <option value={-1}>无排程（常开）</option>
+              {useAppStore.getState().schedules.map((sch) => (
+                <option key={sch.id} value={sch.id}>{sch.name}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+
       <div className="mt-1 px-2 py-1.5 bg-slate-50 rounded text-[10px] text-slate-500">
         ID: {link.id}
       </div>
