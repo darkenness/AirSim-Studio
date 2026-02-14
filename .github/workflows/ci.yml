@@ -1,0 +1,55 @@
+name: CONTAM-Next CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ── C++ Engine Build & Test ──────────────────────────────────────
+  engine:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -S engine -B engine/build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build Engine
+        run: cmake --build engine/build --config Release
+
+      - name: Run C++ Tests
+        run: engine/build/Release/contam_tests.exe --gtest_output=xml:engine/build/test-results.xml
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpp-test-results
+          path: engine/build/test-results.xml
+
+  # ── Frontend TypeScript Check ────────────────────────────────────
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: app
+        run: npm ci
+
+      - name: TypeScript Check
+        working-directory: app
+        run: npx tsc --noEmit
+
+      - name: Build Frontend
+        working-directory: app
+        run: npm run build
