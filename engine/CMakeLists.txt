@@ -107,6 +107,7 @@ add_executable(contam_tests
     test/test_contaminant.cpp
     test/test_elements.cpp
     test/test_control.cpp
+    test/test_advanced.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE

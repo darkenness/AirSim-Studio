@@ -10,12 +10,13 @@ struct Species {
     double molarMass;      // kg/mol (e.g., CO2 = 0.044)
     double decayRate;      // 1/s, first-order decay constant (0 = no decay)
     double outdoorConc;    // kg/m³, outdoor background concentration
+    bool isTrace;          // true = trace (no density feedback), false = non-trace (affects density)
 
-    Species() : id(0), molarMass(0.029), decayRate(0.0), outdoorConc(0.0) {}
+    Species() : id(0), molarMass(0.029), decayRate(0.0), outdoorConc(0.0), isTrace(true) {}
     Species(int id, const std::string& name, double molarMass = 0.029,
-            double decayRate = 0.0, double outdoorConc = 0.0)
+            double decayRate = 0.0, double outdoorConc = 0.0, bool trace = true)
         : id(id), name(name), molarMass(molarMass),
-          decayRate(decayRate), outdoorConc(outdoorConc) {}
+          decayRate(decayRate), outdoorConc(outdoorConc), isTrace(trace) {}
 };
 
 // Source type enumeration

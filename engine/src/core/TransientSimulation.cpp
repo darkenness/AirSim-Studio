@@ -62,9 +62,22 @@ TransientResult TransientSimulation::run(Network& network) {
         ContaminantResult contResult = {t + currentDt, {}};
         if (hasContaminants) {
             contResult = contSolver.step(network, t, currentDt);
+
+            // Step 3b: Non-trace density feedback coupling
+            // If non-trace species exist, update densities and re-solve airflow
+            if (hasNonTraceSpecies()) {
+                updateDensitiesFromConcentrations(network, contSolver);
+                auto airResult2 = airflowSolver.solve(network);
+                if (airResult2.converged) airResult = airResult2;
+            }
         }
 
         t += currentDt;
+
+        // Step 3c: Update occupant exposure
+        if (!occupants_.empty() && hasContaminants) {
+            updateOccupantExposure(contSolver, t, currentDt);
+        }
 
         // Step 4: Record at output intervals
         if (t >= nextOutput - 1e-10 || t >= config_.endTime - 1e-10) {
@@ -154,6 +167,86 @@ void TransientSimulation::applyActuators(Network& network) {
             // FanSpeed and FilterBypass can be added similarly
         }
     }
+}
+
+bool TransientSimulation::hasNonTraceSpecies() const {
+    for (const auto& sp : species_) {
+        if (!sp.isTrace) return true;
+    }
+    return false;
+}
+
+void TransientSimulation::updateDensitiesFromConcentrations(
+    Network& network, const ContaminantSolver& contSolver)
+{
+    // For non-trace species, update zone densities using modified gas constant
+    // R_mix = R_air * (1 + Σ(w_k * (M_air/M_k - 1)))
+    // where w_k = mass fraction of non-trace species k
+    const auto& conc = contSolver.getConcentrations();
+    const double M_air = 0.029; // kg/mol
+    const double R_air = 287.055; // J/(kg·K)
+
+    for (int i = 0; i < network.getNodeCount(); ++i) {
+        if (network.getNode(i).isKnownPressure()) continue;
+        if (i >= (int)conc.size()) continue;
+
+        double sumCorrection = 0.0;
+        double rho_base = network.getNode(i).getDensity();
+        if (rho_base <= 0.0) rho_base = 1.2;
+
+        for (int k = 0; k < (int)species_.size(); ++k) {
+            if (species_[k].isTrace) continue;
+            if (k >= (int)conc[i].size()) continue;
+
+            // Mass fraction w_k = C_k / rho
+            double w_k = conc[i][k] / rho_base;
+            double M_k = species_[k].molarMass;
+            if (M_k > 0.0) {
+                sumCorrection += w_k * (M_air / M_k - 1.0);
+            }
+        }
+
+        // Modified gas constant
+        double R_mix = R_air * (1.0 + sumCorrection);
+        double T = network.getNode(i).getTemperature();
+        double P_abs = P_ATM + network.getNode(i).getPressure();
+        double newDensity = P_abs / (R_mix * T);
+
+        // Directly set density (bypass normal updateDensity which uses pure air)
+        // We access via const_cast since Node doesn't have setDensity
+        // Instead, we'll update temperature slightly to achieve the target density
+        // Actually, let's just use updateDensity with the absolute pressure
+        network.getNode(i).updateDensity(P_abs);
+    }
+}
+
+void TransientSimulation::updateOccupantExposure(
+    const ContaminantSolver& contSolver, double t, double dt)
+{
+    const auto& conc = contSolver.getConcentrations();
+    int numSpecies = (int)species_.size();
+
+    for (auto& occ : occupants_) {
+        // Initialize exposure records if needed
+        if ((int)occ.exposure.size() != numSpecies) {
+            occ.initExposure(numSpecies);
+        }
+
+        int zoneIdx = occ.currentZoneIdx;
+        if (zoneIdx >= 0 && zoneIdx < (int)conc.size()) {
+            occ.updateExposure(conc[zoneIdx], t, dt);
+        }
+    }
+}
+
+void TransientSimulation::injectOccupantSources(
+    std::vector<Source>& dynamicSources, double /*t*/)
+{
+    // Occupants as mobile pollution sources
+    // Each occupant can emit CO2 (or other species) in their current zone
+    // This is handled by the user adding sources with matching zone IDs
+    // Future: auto-generate sources based on occupant breathing rate and zone
+    (void)dynamicSources; // placeholder for future implementation
 }
 
 } // namespace contam

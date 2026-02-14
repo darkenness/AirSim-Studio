@@ -7,6 +7,7 @@
 #include "control/Sensor.h"
 #include "control/Controller.h"
 #include "control/Actuator.h"
+#include "Occupant.h"
 #include <vector>
 #include <map>
 #include <functional>
@@ -52,6 +53,9 @@ public:
     void setControllers(const std::vector<Controller>& controllers) { controllers_ = controllers; }
     void setActuators(const std::vector<Actuator>& actuators) { actuators_ = actuators; }
 
+    // Occupants (exposure tracking + mobile pollution sources)
+    void setOccupants(const std::vector<Occupant>& occupants) { occupants_ = occupants; }
+
     // Optional progress callback: (currentTime, endTime) -> bool (return false to cancel)
     using ProgressCallback = std::function<bool(double, double)>;
     void setProgressCallback(ProgressCallback cb) { progressCb_ = cb; }
@@ -67,12 +71,21 @@ private:
     std::vector<Sensor> sensors_;
     std::vector<Controller> controllers_;
     std::vector<Actuator> actuators_;
+    std::vector<Occupant> occupants_;
     ProgressCallback progressCb_;
 
     // Control system helpers
     void updateSensors(const Network& network, const ContaminantSolver& contSolver);
     void updateControllers(double dt);
     void applyActuators(Network& network);
+
+    // Non-trace density feedback: update zone densities based on non-trace species concentrations
+    bool hasNonTraceSpecies() const;
+    void updateDensitiesFromConcentrations(Network& network, const ContaminantSolver& contSolver);
+
+    // Occupant exposure + mobile source injection
+    void updateOccupantExposure(const ContaminantSolver& contSolver, double t, double dt);
+    void injectOccupantSources(std::vector<Source>& dynamicSources, double t);
 };
 
 } // namespace contam
