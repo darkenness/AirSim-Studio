@@ -76,6 +76,8 @@ set(ENGINE_SOURCES
     src/elements/Duct.cpp
     src/elements/Damper.cpp
     src/elements/Filter.cpp
+    src/elements/SelfRegulatingVent.cpp
+    src/elements/CheckValve.cpp
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
     src/utils/Constants.cpp

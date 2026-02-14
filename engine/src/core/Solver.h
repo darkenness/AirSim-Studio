@@ -62,6 +62,12 @@ private:
                        const std::vector<int>& unknownMap,
                        double& trustRadius, double prevResidualNorm,
                        const Eigen::VectorXd& R);
+
+    // Reverse Cuthill-McKee node reordering for bandwidth reduction
+    // Returns a permutation vector: perm[new_idx] = old_node_idx
+    static std::vector<int> computeRCMOrdering(const Network& network,
+                                                const std::vector<int>& unknownMap,
+                                                int numUnknowns);
 };
 
 } // namespace contam

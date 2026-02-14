@@ -2,6 +2,8 @@
 #include <cmath>
 #include <algorithm>
 #include <iostream>
+#include <queue>
+#include <set>
 
 namespace contam {
 
@@ -141,19 +143,105 @@ void Solver::applyUpdateTR(Network& network, const Eigen::VectorXd& dP,
     }
 }
 
+std::vector<int> Solver::computeRCMOrdering(const Network& network,
+                                              const std::vector<int>& unknownMap,
+                                              int numUnknowns)
+{
+    if (numUnknowns <= 1) {
+        std::vector<int> identity(numUnknowns);
+        for (int i = 0; i < numUnknowns; ++i) identity[i] = i;
+        return identity;
+    }
+
+    // Build adjacency list for the unknown nodes
+    std::vector<std::set<int>> adj(numUnknowns);
+    for (const auto& link : network.getLinks()) {
+        int eqI = unknownMap[link.getNodeFrom()];
+        int eqJ = unknownMap[link.getNodeTo()];
+        if (eqI >= 0 && eqJ >= 0 && eqI != eqJ) {
+            adj[eqI].insert(eqJ);
+            adj[eqJ].insert(eqI);
+        }
+    }
+
+    // Find starting node: the one with minimum degree (peripheral node heuristic)
+    int startNode = 0;
+    int minDeg = (int)adj[0].size();
+    for (int i = 1; i < numUnknowns; ++i) {
+        if ((int)adj[i].size() < minDeg) {
+            minDeg = (int)adj[i].size();
+            startNode = i;
+        }
+    }
+
+    // BFS (Cuthill-McKee ordering)
+    std::vector<int> cmOrder;
+    cmOrder.reserve(numUnknowns);
+    std::vector<bool> visited(numUnknowns, false);
+
+    std::queue<int> bfsQueue;
+    bfsQueue.push(startNode);
+    visited[startNode] = true;
+
+    while (!bfsQueue.empty()) {
+        int node = bfsQueue.front();
+        bfsQueue.pop();
+        cmOrder.push_back(node);
+
+        // Get neighbors sorted by degree (ascending)
+        std::vector<std::pair<int, int>> neighbors;
+        for (int nb : adj[node]) {
+            if (!visited[nb]) {
+                neighbors.emplace_back((int)adj[nb].size(), nb);
+            }
+        }
+        std::sort(neighbors.begin(), neighbors.end());
+
+        for (auto& [deg, nb] : neighbors) {
+            if (!visited[nb]) {
+                visited[nb] = true;
+                bfsQueue.push(nb);
+            }
+        }
+    }
+
+    // Handle disconnected components
+    for (int i = 0; i < numUnknowns; ++i) {
+        if (!visited[i]) cmOrder.push_back(i);
+    }
+
+    // Reverse for RCM
+    std::reverse(cmOrder.begin(), cmOrder.end());
+    return cmOrder;
+}
+
 SolverResult Solver::solve(Network& network) {
     SolverResult result;
 
     // Build unknown map: for each node, map to equation index (-1 if known pressure)
-    std::vector<int> unknownMap(network.getNodeCount(), -1);
+    std::vector<int> baseUnknownMap(network.getNodeCount(), -1);
     int eqIdx = 0;
     for (int i = 0; i < network.getNodeCount(); ++i) {
         if (!network.getNode(i).isKnownPressure()) {
-            unknownMap[i] = eqIdx++;
+            baseUnknownMap[i] = eqIdx++;
         }
     }
 
     int n = eqIdx;  // number of unknowns
+
+    // Apply RCM node reordering for bandwidth reduction
+    auto rcmPerm = computeRCMOrdering(network, baseUnknownMap, n);
+
+    // Build reordered unknownMap: rcmPerm[new] = old, so invPerm[old] = new
+    std::vector<int> invPerm(n);
+    for (int i = 0; i < n; ++i) invPerm[rcmPerm[i]] = i;
+
+    std::vector<int> unknownMap(network.getNodeCount(), -1);
+    for (int i = 0; i < network.getNodeCount(); ++i) {
+        if (baseUnknownMap[i] >= 0) {
+            unknownMap[i] = invPerm[baseUnknownMap[i]];
+        }
+    }
     if (n == 0) {
         result.converged = true;
         return result;

@@ -259,3 +259,135 @@ TEST(SpeciesTest, TraceFlag) {
     Species h2o(1, "H2O", 0.018, 0.0, 0.0, false);
     EXPECT_FALSE(h2o.isTrace);
 }
+
+// ── SelfRegulatingVent Tests ─────────────────────────────────────────
+
+#include "elements/SelfRegulatingVent.h"
+
+TEST(SelfRegVentTest, RampUpRegion) {
+    SelfRegulatingVent srv(0.01, 2.0, 50.0); // 0.01 m³/s, pMin=2, pMax=50
+    // At ΔP=1 (below pMin=2): ramp up, flow = 0.01 * 1/2 = 0.005 m³/s
+    auto r = srv.calculate(1.0, 1.2);
+    EXPECT_NEAR(r.massFlow, 1.2 * 0.005, 1e-6);
+}
+
+TEST(SelfRegVentTest, RegulationRegion) {
+    SelfRegulatingVent srv(0.01, 2.0, 50.0);
+    // At ΔP=10 (between pMin and pMax): constant flow
+    auto r10 = srv.calculate(10.0, 1.2);
+    auto r30 = srv.calculate(30.0, 1.2);
+    EXPECT_NEAR(r10.massFlow, 1.2 * 0.01, 1e-6);
+    EXPECT_NEAR(r30.massFlow, 1.2 * 0.01, 1e-6);
+}
+
+TEST(SelfRegVentTest, OverflowRegion) {
+    SelfRegulatingVent srv(0.01, 2.0, 50.0);
+    // At ΔP=200 (above pMax=50): overflow, flow > targetFlow
+    auto r = srv.calculate(200.0, 1.2);
+    EXPECT_GT(r.massFlow, 1.2 * 0.01);
+}
+
+TEST(SelfRegVentTest, NegativePressure) {
+    SelfRegulatingVent srv(0.01, 2.0, 50.0);
+    // Negative ΔP: reverse flow
+    auto r = srv.calculate(-10.0, 1.2);
+    EXPECT_LT(r.massFlow, 0.0);
+}
+
+TEST(SelfRegVentTest, Clone) {
+    SelfRegulatingVent srv(0.01, 2.0, 50.0);
+    auto cloned = srv.clone();
+    auto r1 = srv.calculate(10.0, 1.2);
+    auto r2 = cloned->calculate(10.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
+}
+
+// ── CheckValve Tests ─────────────────────────────────────────────────
+
+#include "elements/CheckValve.h"
+
+TEST(CheckValveTest, ForwardFlow) {
+    CheckValve cv(0.001, 0.65);
+    auto r = cv.calculate(10.0, 1.2);
+    EXPECT_GT(r.massFlow, 0.0);
+    EXPECT_GT(r.derivative, 0.0);
+}
+
+TEST(CheckValveTest, ReverseBlocked) {
+    CheckValve cv(0.001, 0.65);
+    auto r = cv.calculate(-10.0, 1.2);
+    EXPECT_DOUBLE_EQ(r.massFlow, 0.0);
+    // Derivative should be tiny but positive for numerical stability
+    EXPECT_GT(r.derivative, 0.0);
+    EXPECT_LT(r.derivative, 1e-6);
+}
+
+TEST(CheckValveTest, ZeroPressure) {
+    CheckValve cv(0.001, 0.65);
+    auto r = cv.calculate(0.0, 1.2);
+    EXPECT_DOUBLE_EQ(r.massFlow, 0.0);
+}
+
+TEST(CheckValveTest, MatchesPowerLawForward) {
+    CheckValve cv(0.001, 0.65);
+    PowerLawOrifice plo(0.001, 0.65);
+    auto rcv = cv.calculate(10.0, 1.2);
+    auto rplo = plo.calculate(10.0, 1.2);
+    EXPECT_NEAR(rcv.massFlow, rplo.massFlow, 1e-10);
+}
+
+TEST(CheckValveTest, Clone) {
+    CheckValve cv(0.001, 0.65);
+    auto cloned = cv.clone();
+    auto r1 = cv.calculate(10.0, 1.2);
+    auto r2 = cloned->calculate(10.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
+}
+
+// ── Occupant Zone Movement Test ──────────────────────────────────────
+
+TEST(OccupantMoveTest, ZoneChange) {
+    Occupant occ(0, "Worker", 0, 1.2e-4);  // starts in zone 0
+    occ.initExposure(1);
+
+    // Expose in zone 0 with conc=0.001
+    occ.updateExposure({0.001}, 0.0, 60.0);
+    EXPECT_NEAR(occ.exposure[0].cumulativeDose, 1.2e-4 * 0.001 * 60.0, 1e-12);
+
+    // Move to zone 1 (higher concentration)
+    occ.currentZoneIdx = 1;
+    occ.updateExposure({0.005}, 60.0, 60.0);
+    double expectedTotal = 1.2e-4 * 0.001 * 60.0 + 1.2e-4 * 0.005 * 60.0;
+    EXPECT_NEAR(occ.exposure[0].cumulativeDose, expectedTotal, 1e-12);
+    EXPECT_DOUBLE_EQ(occ.exposure[0].peakConcentration, 0.005);
+}
+
+// ── Node Reordering Verification ─────────────────────────────────────
+
+TEST(RCMOrderingTest, BasicOrdering) {
+    Network net;
+
+    Node n0(0, "Outdoor", NodeType::Ambient);
+    n0.setTemperature(283.15);
+    net.addNode(n0);
+
+    // Create a chain of 4 rooms: 1-2-3-4
+    for (int i = 1; i <= 4; ++i) {
+        Node n(i, "Room" + std::to_string(i));
+        n.setTemperature(293.15);
+        n.setVolume(30.0);
+        net.addNode(n);
+    }
+
+    // Links: 0-1, 1-2, 2-3, 3-4
+    for (int i = 0; i < 4; ++i) {
+        Link l(i + 1, i, i + 1, 1.0);
+        l.setFlowElement(std::make_unique<PowerLawOrifice>(0.003, 0.65));
+        net.addLink(std::move(l));
+    }
+
+    Solver solver;
+    auto result = solver.solve(net);
+    EXPECT_TRUE(result.converged);
+    // Just verify it converges with RCM reordering active
+}
