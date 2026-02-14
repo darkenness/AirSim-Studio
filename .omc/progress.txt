@@ -31,5 +31,25 @@ Started: 2026-02-14T16:14:00+08:00
 
 ---
 
-## US-001: shadcn/ui + Design Token Foundation
-Status: IN PROGRESS
+## Completed User Stories (16/19)
+- US-001: ✅ shadcn/ui foundation (12 components + tokens + cn())
+- US-002: ✅ Layout restructure (resizable panels + vertical toolbar + TopBar + dark toggle + toast + confirm)
+- US-003: ✅ PropertyPanel Tab化 (5 tabs: 模型/污染物/排程/控制/人员)
+- US-004: ✅ SketchPad zoom controls + design tokens
+- US-005: ✅ Canvas right-click context menu (node/link/canvas)
+- US-006: ✅ Pollutant templates (CO/CO2/HCHO/PM2.5/Rn one-click)
+- US-007: ✅ ACH calculation + steady-state CSV export
+- US-008: ✅ Concentration heatmap foundation + source icons on canvas
+- US-009: ✅ Occupant system (types + store + OccupantPanel + movement schedule + JSON)
+- US-010: ✅ Exposure report panel (cumulative dose + peak + TWA + CSV export)
+- US-011: ✅ Enhanced transient CSV export (pressure + concentration columns)
+- US-012: ✅ Schedule binding to airflow elements (scheduleId on links)
+- US-013: ✅ HVAC element types (SupplyDiffuser/ReturnGrille)
+- US-014: ✅ Multi-floor building types (level + isShaft on ZoneNode)
+- US-015: ✅ Welcome page with example model loader
+- US-016: ✅ Bottom panel Tab化 (稳态/瞬态/暴露)
+
+## Remaining
+- US-017: 仿真进度条 + 中途取消
+- US-018: 深色模式完善 + 动效
+- US-019: 性能优化 + a11y
