@@ -174,6 +174,7 @@ export interface TopologyJson {
   sources?: Source[];
   schedules?: Schedule[];
   occupants?: Occupant[];
+  controls?: ControlSystem;
   transient?: TransientConfig;
 }
 
@@ -190,6 +191,39 @@ export interface Occupant {
   breathingRate: number;  // m³/s
   co2EmissionRate: number; // kg/s (exhaled CO2)
   schedule: OccupantZoneAssignment[];
+}
+
+// ── Control System ───────────────────────────────────────────────
+export interface SensorDef {
+  id: number;
+  name: string;
+  type: 'Concentration' | 'Pressure' | 'Temperature' | 'MassFlow';
+  targetId: number;
+  speciesIdx: number;
+}
+
+export interface ControllerDef {
+  id: number;
+  name: string;
+  sensorId: number;
+  actuatorId: number;
+  setpoint: number;
+  Kp: number;
+  Ki: number;
+  deadband: number;
+}
+
+export interface ActuatorDef {
+  id: number;
+  name: string;
+  type: 'DamperFraction' | 'FanSpeed' | 'FilterBypass';
+  linkIdx: number;
+}
+
+export interface ControlSystem {
+  sensors: SensorDef[];
+  controllers: ControllerDef[];
+  actuators: ActuatorDef[];
 }
 
 // ── UI State ─────────────────────────────────────────────────────────
@@ -215,6 +249,7 @@ export interface AppState {
   sources: Source[];
   schedules: Schedule[];
   occupants: Occupant[];
+  controlSystem: ControlSystem;
   transientConfig: TransientConfig;
 
   // Simulation
@@ -247,6 +282,7 @@ export interface AppState {
   addOccupant: (occ: Occupant) => void;
   removeOccupant: (id: number) => void;
   updateOccupant: (id: number, updates: Partial<Occupant>) => void;
+  setControlSystem: (cs: ControlSystem) => void;
   setTransientConfig: (config: Partial<TransientConfig>) => void;
   setTransientResult: (result: TransientResult | null) => void;
   exportTopology: () => TopologyJson;

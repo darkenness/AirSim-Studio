@@ -59,13 +59,28 @@ function NodeProperties() {
       />
 
       {!isAmbient && (
-        <InputField
-          label="体积" value={node.volume} unit="m³" type="number" step="1"
-          onChange={(v) => updateNode(node.id, { volume: parseFloat(v) || 0 })}
-        />
+        <>
+          <InputField
+            label="体积" value={node.volume} unit="m³" type="number" step="1"
+            onChange={(v) => updateNode(node.id, { volume: parseFloat(v) || 0 })}
+          />
+          <InputField
+            label="楼层" value={node.level ?? 0} type="number" step="1"
+            onChange={(v) => updateNode(node.id, { level: parseInt(v) || 0 })}
+          />
+          <label className="flex items-center gap-2 text-xs text-foreground">
+            <input
+              type="checkbox"
+              checked={node.isShaft ?? false}
+              onChange={(e) => updateNode(node.id, { isShaft: e.target.checked })}
+              className="rounded border-border"
+            />
+            竖井 / 楼梯间（跨楼层）
+          </label>
+        </>
       )}
 
-      <div className="mt-1 px-2 py-1.5 bg-slate-50 rounded text-[10px] text-slate-500">
+      <div className="mt-1 px-2 py-1.5 bg-muted rounded text-[11px] text-muted-foreground">
         ID: {node.id} &nbsp;|&nbsp; 类型: {node.type} &nbsp;|&nbsp; 位置: ({node.x}, {node.y})
       </div>
     </div>

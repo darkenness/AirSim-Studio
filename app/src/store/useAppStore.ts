@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem } from '../types';
 
 export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Model data
@@ -22,6 +22,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   sources: [],
   schedules: [],
   occupants: [],
+  controlSystem: { sensors: [], controllers: [], actuators: [] },
   transientConfig: { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
 
   // Simulation
@@ -114,6 +115,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   updateOccupant: (id: number, updates) => set((state) => ({
     occupants: state.occupants.map((o) => (o.id === id ? { ...o, ...updates } : o)),
   })),
+  setControlSystem: (cs: ControlSystem) => set({ controlSystem: cs }),
   setTransientConfig: (config) => set((state) => ({
     transientConfig: { ...state.transientConfig, ...config },
   })),
@@ -152,6 +154,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
       sources: state.sources.length > 0 ? state.sources : undefined,
       schedules: state.schedules.length > 0 ? state.schedules : undefined,
       occupants: state.occupants.length > 0 ? state.occupants : undefined,
+      controls: (state.controlSystem.sensors.length > 0 || state.controlSystem.controllers.length > 0 || state.controlSystem.actuators.length > 0) ? state.controlSystem : undefined,
       transient: state.species.length > 0 ? state.transientConfig : undefined,
     };
   },
@@ -208,6 +211,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
       sources: json.sources ?? [],
       schedules: json.schedules ?? [],
       occupants: json.occupants ?? [],
+      controlSystem: json.controls ?? { sensors: [], controllers: [], actuators: [] },
       transientConfig: json.transient ?? { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
       result: null,
       transientResult: null,
@@ -223,6 +227,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
     sources: [],
     schedules: [],
     occupants: [],
+    controlSystem: { sensors: [], controllers: [], actuators: [] },
     selectedNodeId: null,
     selectedLinkId: null,
     result: null,

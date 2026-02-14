@@ -11,8 +11,9 @@ import TransientChart from './components/TransientChart/TransientChart';
 import ExposureReport from './components/ExposureReport/ExposureReport';
 import StatusBar from './components/StatusBar/StatusBar';
 import { useAppStore } from './store/useAppStore';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { toast } from './hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 
 function BottomPanel() {
@@ -77,12 +78,34 @@ function BottomPanel() {
 }
 
 function App() {
-  const { nodes } = useAppStore();
+  const { nodes, loadFromJson } = useAppStore();
   const isEmpty = nodes.length === 0;
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.name.endsWith('.json')) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const json = JSON.parse(ev.target?.result as string);
+        loadFromJson(json);
+        toast({ title: '已加载', description: file.name });
+      } catch {
+        toast({ title: '文件解析失败', variant: 'destructive' });
+      }
+    };
+    reader.readAsText(file);
+  }, [loadFromJson]);
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-screen w-screen bg-background text-foreground">
+      <div className="flex flex-col h-screen w-screen bg-background text-foreground" onDragOver={handleDragOver} onDrop={handleDrop}>
         <TopBar />
         {isEmpty ? (
           <WelcomePage />
