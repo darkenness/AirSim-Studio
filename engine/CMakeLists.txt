@@ -35,18 +35,23 @@ FetchContent_Declare(
 # Prevent GTest from overriding compiler/linker settings on Windows
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 
-# pybind11 (Python bindings)
-FetchContent_Declare(
-    pybind11
-    GIT_REPOSITORY https://github.com/pybind/pybind11.git
-    GIT_TAG        v2.11.1
-    GIT_SHALLOW    TRUE
-)
+# pybind11 (Python bindings) - optional, requires Python dev headers
+option(CONTAM_ENABLE_PYTHON "Enable Python bindings (pybind11)" OFF)
+
+if(CONTAM_ENABLE_PYTHON)
+    FetchContent_Declare(
+        pybind11
+        GIT_REPOSITORY https://github.com/pybind/pybind11.git
+        GIT_TAG        v2.11.1
+        GIT_SHALLOW    TRUE
+    )
+    FetchContent_MakeAvailable(eigen json googletest pybind11)
+else()
+    FetchContent_MakeAvailable(eigen json googletest)
+endif()
 
 # HighFive (header-only HDF5 C++ wrapper) - optional
 option(CONTAM_ENABLE_HDF5 "Enable HDF5 output support" OFF)
-
-FetchContent_MakeAvailable(eigen json googletest pybind11)
 
 if(CONTAM_ENABLE_HDF5)
     find_package(HDF5 REQUIRED COMPONENTS C)
@@ -120,6 +125,8 @@ target_link_libraries(contam_tests PRIVATE
 include(GoogleTest)
 gtest_discover_tests(contam_tests)
 
-# ── Python Module ─────────────────────────────────────────────────────
-pybind11_add_module(pycontam python/pycontam.cpp)
-target_link_libraries(pycontam PRIVATE contam_engine_lib)
+# ── Python Module (optional) ──────────────────────────────────────────
+if(CONTAM_ENABLE_PYTHON)
+    pybind11_add_module(pycontam python/pycontam.cpp)
+    target_link_libraries(pycontam PRIVATE contam_engine_lib)
+endif()
