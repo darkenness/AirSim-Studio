@@ -14,9 +14,12 @@ namespace contam {
 // Flow is always in the positive direction (from node_i to node_j).
 class Fan : public FlowElement {
 public:
-    // maxFlow: maximum volumetric flow rate at zero pressure (m³/s)
-    // shutoffPressure: pressure at which flow drops to zero (Pa)
+    // Simple linear mode: maxFlow at ΔP=0, zero flow at shutoffPressure
     Fan(double maxFlow, double shutoffPressure);
+
+    // Polynomial mode: ΔP = coeffs[0] + coeffs[1]*Q + coeffs[2]*Q² + ...
+    // coeffs[0] = shutoff pressure, flow solved by Newton iteration
+    explicit Fan(const std::vector<double>& coeffs);
 
     FlowResult calculate(double deltaP, double density) const override;
     std::string typeName() const override { return "Fan"; }
@@ -24,10 +27,21 @@ public:
 
     double getMaxFlow() const { return maxFlow_; }
     double getShutoffPressure() const { return shutoffPressure_; }
+    bool isPolynomial() const { return usePolynomial_; }
+    const std::vector<double>& getCoeffs() const { return coeffs_; }
 
 private:
     double maxFlow_;          // m³/s at ΔP=0
     double shutoffPressure_;  // Pa, fan curve intercept
+    bool usePolynomial_;      // true = polynomial mode
+    std::vector<double> coeffs_; // polynomial coefficients
+
+    // Evaluate polynomial: ΔP_fan(Q) = sum(coeffs[i] * Q^i)
+    double evalCurve(double Q) const;
+    // Derivative: dΔP_fan/dQ = sum(i * coeffs[i] * Q^(i-1))
+    double evalCurveDerivative(double Q) const;
+    // Newton solve: find Q such that evalCurve(Q) = deltaP
+    double solveForFlow(double deltaP) const;
 };
 
 } // namespace contam

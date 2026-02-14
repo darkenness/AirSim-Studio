@@ -72,6 +72,62 @@ TEST(FanTest, Clone) {
     EXPECT_DOUBLE_EQ(result1.massFlow, result2.massFlow);
 }
 
+// ── Fan Polynomial Tests ─────────────────────────────────────────────
+
+TEST(FanPolyTest, QuadraticCurve) {
+    // ΔP = 200 - 4000*Q  (linear, equivalent to maxFlow=0.05, shutoff=200)
+    Fan fan(std::vector<double>{200.0, -4000.0});
+    EXPECT_TRUE(fan.isPolynomial());
+    EXPECT_NEAR(fan.getShutoffPressure(), 200.0, 1e-6);
+
+    // At ΔP=0, Q should be ~0.05
+    auto r0 = fan.calculate(0.0, 1.2);
+    EXPECT_NEAR(r0.massFlow, 1.2 * 0.05, 1e-4);
+
+    // At ΔP=200 (shutoff), Q should be ~0
+    auto r200 = fan.calculate(200.0, 1.2);
+    EXPECT_NEAR(r200.massFlow, 0.0, 1e-6);
+}
+
+TEST(FanPolyTest, CubicCurve) {
+    // ΔP = 300 - 2000*Q - 50000*Q²
+    Fan fan(std::vector<double>{300.0, -2000.0, -50000.0});
+    EXPECT_TRUE(fan.isPolynomial());
+
+    // At ΔP=0, should give some positive flow
+    auto r = fan.calculate(0.0, 1.2);
+    EXPECT_GT(r.massFlow, 0.0);
+
+    // At shutoff (ΔP=300), flow ~0
+    auto rs = fan.calculate(300.0, 1.2);
+    EXPECT_NEAR(rs.massFlow, 0.0, 1e-4);
+}
+
+TEST(FanPolyTest, MatchesLinearMode) {
+    // Both should give same results for a linear curve
+    Fan linear(0.05, 200.0);
+    Fan poly(std::vector<double>{200.0, -4000.0});
+
+    double density = 1.2;
+    for (double dp : {0.0, 50.0, 100.0, 150.0}) {
+        auto rl = linear.calculate(dp, density);
+        auto rp = poly.calculate(dp, density);
+        EXPECT_NEAR(rl.massFlow, rp.massFlow, 1e-4);
+    }
+}
+
+TEST(FanPolyTest, InvalidCoeffs) {
+    EXPECT_THROW(Fan(std::vector<double>{200.0}), std::invalid_argument);
+}
+
+TEST(FanPolyTest, ClonePolynomial) {
+    Fan fan(std::vector<double>{200.0, -4000.0, -10000.0});
+    auto cloned = fan.clone();
+    auto r1 = fan.calculate(50.0, 1.2);
+    auto r2 = cloned->calculate(50.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
+}
+
 // ── TwoWayFlow Tests ─────────────────────────────────────────────────
 
 TEST(TwoWayFlowTest, PositivePressurePositiveFlow) {
