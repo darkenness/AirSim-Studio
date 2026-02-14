@@ -106,6 +106,12 @@ html, body, #root {
   color: var(--foreground);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+/* Smooth theme transitions for panels and cards */
+aside, header, footer, [class*="bg-card"], [class*="bg-background"], [class*="bg-popover"] {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
 }
 
 /* ── Scrollbar Styling ───────────────────────────────────────────── */
