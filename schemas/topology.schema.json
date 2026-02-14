@@ -1,79 +1,189 @@
 {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "CONTAM-Next Topology Input",
-    "description": "JSON schema for CONTAM-Next building topology and airflow network definition",
+    "description": "JSON schema for CONTAM-Next building topology and airflow network definition (v2.0)",
     "type": "object",
     "properties": {
-        "description": {
-            "type": "string",
-            "description": "Human-readable description of the model"
-        },
+        "description": { "type": "string" },
         "ambient": {
             "type": "object",
-            "description": "Outdoor/ambient boundary conditions",
             "properties": {
-                "temperature": { "type": "number", "description": "Ambient temperature (K)" },
-                "pressure": { "type": "number", "description": "Ambient gauge pressure (Pa), usually 0" },
-                "windSpeed": { "type": "number", "description": "Wind speed (m/s)" },
-                "windDirection": { "type": "number", "description": "Wind direction (degrees from north)" }
-            }
-        },
-        "flowElements": {
-            "type": "object",
-            "description": "Named flow element definitions (reusable templates)",
-            "additionalProperties": {
-                "type": "object",
-                "required": ["type"],
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": ["PowerLawOrifice", "LargeOpening", "Fan", "Duct", "Damper"]
-                    },
-                    "C": { "type": "number", "description": "Flow coefficient (PowerLawOrifice)" },
-                    "n": { "type": "number", "description": "Flow exponent 0.5-1.0 (PowerLawOrifice)" }
-                }
+                "temperature": { "type": "number", "description": "K" },
+                "pressure": { "type": "number", "description": "Pa gauge, usually 0" },
+                "windSpeed": { "type": "number", "description": "m/s" },
+                "windDirection": { "type": "number", "description": "degrees from north" }
             }
         },
         "nodes": {
             "type": "array",
-            "description": "Zone/node definitions",
             "items": {
                 "type": "object",
                 "required": ["id"],
                 "properties": {
-                    "id": { "type": "integer", "description": "Unique node ID" },
+                    "id": { "type": "integer" },
                     "name": { "type": "string" },
-                    "type": {
-                        "type": "string",
-                        "enum": ["normal", "ambient", "phantom", "cfd"],
-                        "default": "normal"
-                    },
-                    "temperature": { "type": "number", "description": "Zone temperature (K)" },
-                    "elevation": { "type": "number", "description": "Base elevation (m)" },
-                    "volume": { "type": "number", "description": "Zone volume (m³)" },
-                    "pressure": { "type": "number", "description": "Initial/fixed gauge pressure (Pa)" }
+                    "type": { "type": "string", "enum": ["normal", "ambient"], "default": "normal" },
+                    "temperature": { "type": "number", "description": "K" },
+                    "elevation": { "type": "number", "description": "m" },
+                    "volume": { "type": "number", "description": "m³" },
+                    "pressure": { "type": "number", "description": "Pa gauge" }
                 }
             }
         },
         "links": {
             "type": "array",
-            "description": "Airflow path definitions",
             "items": {
                 "type": "object",
                 "required": ["id", "from", "to"],
                 "properties": {
-                    "id": { "type": "integer", "description": "Unique link ID" },
-                    "from": { "type": "integer", "description": "Source node ID" },
-                    "to": { "type": "integer", "description": "Destination node ID" },
-                    "elevation": { "type": "number", "description": "Path centerline elevation (m)" },
+                    "id": { "type": "integer" },
+                    "from": { "type": "integer" },
+                    "to": { "type": "integer" },
+                    "elevation": { "type": "number", "description": "m" },
                     "element": {
-                        "description": "Flow element: string reference to flowElements, or inline object",
-                        "oneOf": [
-                            { "type": "string" },
-                            { "type": "object", "required": ["type"] }
-                        ]
+                        "type": "object",
+                        "required": ["type"],
+                        "properties": {
+                            "type": { "type": "string", "enum": ["PowerLawOrifice", "TwoWayFlow", "Fan", "Duct", "Damper", "Filter"] },
+                            "C": { "type": "number", "description": "Flow coefficient (PowerLawOrifice/Filter)" },
+                            "n": { "type": "number", "description": "Flow exponent 0.5-1.0" },
+                            "Cd": { "type": "number", "description": "Discharge coefficient (TwoWayFlow)" },
+                            "area": { "type": "number", "description": "Opening area m² (TwoWayFlow)" },
+                            "maxFlow": { "type": "number", "description": "m³/s at ΔP=0 (Fan)" },
+                            "shutoffPressure": { "type": "number", "description": "Pa (Fan)" },
+                            "coeffs": { "type": "array", "items": { "type": "number" }, "description": "Polynomial coefficients (Fan)" },
+                            "length": { "type": "number", "description": "m (Duct)" },
+                            "diameter": { "type": "number", "description": "m (Duct)" },
+                            "roughness": { "type": "number", "description": "m (Duct)" },
+                            "sumK": { "type": "number", "description": "Minor loss coefficients (Duct)" },
+                            "Cmax": { "type": "number", "description": "Max flow coefficient (Damper)" },
+                            "fraction": { "type": "number", "description": "Opening fraction 0-1 (Damper)" },
+                            "efficiency": { "type": "number", "description": "Removal efficiency 0-1 (Filter)" }
+                        }
                     }
                 }
+            }
+        },
+        "species": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" },
+                    "molarMass": { "type": "number", "description": "kg/mol" },
+                    "decayRate": { "type": "number", "description": "1/s" },
+                    "ambientConcentration": { "type": "number", "description": "kg/m³" }
+                }
+            }
+        },
+        "sources": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["nodeId", "speciesIdx"],
+                "properties": {
+                    "nodeId": { "type": "integer" },
+                    "speciesIdx": { "type": "integer" },
+                    "generationRate": { "type": "number", "description": "kg/s" },
+                    "removalRate": { "type": "number", "description": "1/s" },
+                    "scheduleId": { "type": "integer" }
+                }
+            }
+        },
+        "schedules": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "points"],
+                "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" },
+                    "points": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["time", "value"],
+                            "properties": {
+                                "time": { "type": "number", "description": "s" },
+                                "value": { "type": "number" }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "controls": {
+            "type": "object",
+            "properties": {
+                "sensors": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "type", "targetId"],
+                        "properties": {
+                            "id": { "type": "integer" },
+                            "name": { "type": "string" },
+                            "type": { "type": "string", "enum": ["Concentration", "Pressure", "Temperature", "MassFlow"] },
+                            "targetId": { "type": "integer" },
+                            "speciesIdx": { "type": "integer" }
+                        }
+                    }
+                },
+                "controllers": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "sensorId", "actuatorId", "setpoint"],
+                        "properties": {
+                            "id": { "type": "integer" },
+                            "name": { "type": "string" },
+                            "sensorId": { "type": "integer" },
+                            "actuatorId": { "type": "integer" },
+                            "setpoint": { "type": "number" },
+                            "Kp": { "type": "number" },
+                            "Ki": { "type": "number" },
+                            "deadband": { "type": "number" }
+                        }
+                    }
+                },
+                "actuators": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["id", "type", "linkIdx"],
+                        "properties": {
+                            "id": { "type": "integer" },
+                            "name": { "type": "string" },
+                            "type": { "type": "string", "enum": ["DamperFraction", "FanSpeed", "FilterBypass"] },
+                            "linkIdx": { "type": "integer" }
+                        }
+                    }
+                }
+            }
+        },
+        "occupants": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "required": ["id", "zoneIdx"],
+                "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" },
+                    "zoneIdx": { "type": "integer" },
+                    "breathingRate": { "type": "number", "description": "m³/s" },
+                    "scheduleId": { "type": "integer" }
+                }
+            }
+        },
+        "transient": {
+            "type": "object",
+            "properties": {
+                "startTime": { "type": "number", "description": "s" },
+                "endTime": { "type": "number", "description": "s" },
+                "timeStep": { "type": "number", "description": "s" },
+                "outputInterval": { "type": "number", "description": "s" }
             }
         }
     },
