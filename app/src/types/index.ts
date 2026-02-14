@@ -17,7 +17,7 @@ export interface ZoneNode {
 }
 
 // ── Flow Element ─────────────────────────────────────────────────────
-export type FlowElementType = 'PowerLawOrifice' | 'TwoWayFlow' | 'Fan' | 'Duct' | 'Damper' | 'Filter';
+export type FlowElementType = 'PowerLawOrifice' | 'TwoWayFlow' | 'Fan' | 'Duct' | 'Damper' | 'Filter' | 'SelfRegulatingVent' | 'CheckValve';
 
 export interface FlowElementDef {
   type: FlowElementType;
@@ -34,6 +34,11 @@ export interface FlowElementDef {
   Cmax?: number;           // max flow coefficient (Damper)
   fraction?: number;       // opening fraction 0-1 (Damper)
   efficiency?: number;     // removal efficiency 0-1 (Filter)
+  targetFlow?: number;     // target volumetric flow m³/s (SelfRegulatingVent)
+  pMin?: number;           // min regulation pressure Pa (SelfRegulatingVent)
+  pMax?: number;           // max regulation pressure Pa (SelfRegulatingVent)
+  height?: number;         // opening height m (TwoWayFlow)
+  coeffs?: number[];       // polynomial coefficients (Fan)
 }
 
 // ── Link (Airflow Path) ──────────────────────────────────────────────

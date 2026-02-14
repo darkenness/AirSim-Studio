@@ -118,6 +118,8 @@ function LinkProperties() {
                 Duct: { type: 'Duct', length: 5.0, diameter: 0.2, roughness: 0.0001, sumK: 0 },
                 Damper: { type: 'Damper', Cmax: 0.005, n: 0.65, fraction: 1.0 },
                 Filter: { type: 'Filter', C: 0.002, n: 0.65, efficiency: 0.9 },
+                SelfRegulatingVent: { type: 'SelfRegulatingVent', targetFlow: 0.01, pMin: 2.0, pMax: 50.0 },
+                CheckValve: { type: 'CheckValve', C: 0.001, n: 0.65 },
               };
               updateLink(link.id, { element: defaults[newType] ?? { type: newType } });
             }}
@@ -129,6 +131,8 @@ function LinkProperties() {
             <option value="Duct">风管 / 管道</option>
             <option value="Damper">阀门 / 风阀</option>
             <option value="Filter">过滤器</option>
+            <option value="SelfRegulatingVent">自调节通风口</option>
+            <option value="CheckValve">单向阀</option>
           </select>
         </label>
 
@@ -253,6 +257,46 @@ function LinkProperties() {
               label="去除效率 (0~1)" value={link.element.efficiency ?? 0.9} type="number" step="0.05"
               onChange={(v) => updateLink(link.id, {
                 element: { ...link.element, efficiency: Math.max(0, Math.min(1, parseFloat(v) || 0.9)) }
+              })}
+            />
+          </>
+        )}
+
+        {link.element.type === 'SelfRegulatingVent' && (
+          <>
+            <InputField
+              label="目标流量 (m³/s)" value={link.element.targetFlow ?? 0.01} type="number" step="0.001"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, targetFlow: Math.max(0.0001, parseFloat(v) || 0.01) }
+              })}
+            />
+            <InputField
+              label="最小调节压力 (Pa)" value={link.element.pMin ?? 2.0} type="number" step="0.5"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, pMin: Math.max(0.1, parseFloat(v) || 2.0) }
+              })}
+            />
+            <InputField
+              label="最大调节压力 (Pa)" value={link.element.pMax ?? 50.0} type="number" step="1"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, pMax: Math.max(1.0, parseFloat(v) || 50.0) }
+              })}
+            />
+          </>
+        )}
+
+        {link.element.type === 'CheckValve' && (
+          <>
+            <InputField
+              label="流动系数 (C)" value={link.element.C ?? 0.001} type="number" step="0.0001"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, C: Math.max(0.0001, parseFloat(v) || 0.001) }
+              })}
+            />
+            <InputField
+              label="流动指数 (n)" value={link.element.n ?? 0.65} type="number" step="0.01"
+              onChange={(v) => updateLink(link.id, {
+                element: { ...link.element, n: Math.max(0.5, Math.min(1.0, parseFloat(v) || 0.65)) }
               })}
             />
           </>

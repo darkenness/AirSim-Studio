@@ -254,6 +254,8 @@ export default function SketchPad() {
               Duct: '风管',
               Damper: '阀门',
               Filter: '过滤器',
+              SelfRegulatingVent: '自调节',
+              CheckValve: '单向阀',
             };
             const typeTag = elemLabel[link.element.type] ?? link.element.type;
 
