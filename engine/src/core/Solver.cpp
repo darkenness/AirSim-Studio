@@ -1,4 +1,5 @@
 #include "core/Solver.h"
+#include <Eigen/IterativeLinearSolvers>
 #include <cmath>
 #include <algorithm>
 #include <iostream>
@@ -274,15 +275,40 @@ SolverResult Solver::solve(Network& network) {
         }
 
         // Solve J * dP = -R
-        Eigen::SparseLU<Eigen::SparseMatrix<double>> solver;
-        solver.compute(J);
-        if (solver.info() != Eigen::Success) {
-            std::cerr << "Solver: Jacobian decomposition failed at iteration " << iter << std::endl;
-            break;
+        // Auto-switch: SparseLU for small systems, BiCGSTAB+ILU for large
+        Eigen::VectorXd dP;
+        bool solveOk = false;
+
+        if (n > 50) {
+            // Large system: use iterative BiCGSTAB with ILU preconditioning
+            Eigen::BiCGSTAB<Eigen::SparseMatrix<double>, Eigen::IncompleteLUT<double>> iterSolver;
+            iterSolver.setMaxIterations(1000);
+            iterSolver.setTolerance(1e-10);
+            iterSolver.compute(J);
+            if (iterSolver.info() == Eigen::Success) {
+                dP = iterSolver.solve(-R);
+                solveOk = (iterSolver.info() == Eigen::Success);
+            }
+            // Fallback to direct if iterative fails
+            if (!solveOk) {
+                Eigen::SparseLU<Eigen::SparseMatrix<double>> directSolver;
+                directSolver.compute(J);
+                if (directSolver.info() == Eigen::Success) {
+                    dP = directSolver.solve(-R);
+                    solveOk = (directSolver.info() == Eigen::Success);
+                }
+            }
+        } else {
+            // Small system: use direct SparseLU
+            Eigen::SparseLU<Eigen::SparseMatrix<double>> directSolver;
+            directSolver.compute(J);
+            if (directSolver.info() == Eigen::Success) {
+                dP = directSolver.solve(-R);
+                solveOk = (directSolver.info() == Eigen::Success);
+            }
         }
 
-        Eigen::VectorXd dP = solver.solve(-R);
-        if (solver.info() != Eigen::Success) {
+        if (!solveOk) {
             std::cerr << "Solver: linear solve failed at iteration " << iter << std::endl;
             break;
         }
