@@ -1,6 +1,7 @@
 import { useAppStore } from '../../store/useAppStore';
 import type { FlowElementType, FlowElementDef } from '../../types';
 import { Trash2, Box, Cloud, Link2 } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import ContaminantPanel from '../ContaminantPanel/ContaminantPanel';
 import ModelSummary from '../ModelSummary/ModelSummary';
 import ScheduleEditor from '../ScheduleEditor/ScheduleEditor';
@@ -335,34 +336,51 @@ function AmbientSettings() {
 export default function PropertyPanel() {
   const { selectedNodeId, selectedLinkId } = useAppStore();
 
-  return (
-    <aside className="w-64 bg-white border-l border-slate-200 flex flex-col shrink-0 overflow-y-auto">
-      <div className="px-3 py-2 border-b border-slate-100">
-        <h2 className="text-[11px] font-bold text-slate-400 tracking-wider">属性面板</h2>
-      </div>
+  const hasSelection = selectedNodeId !== null || selectedLinkId !== null;
 
-      <div className="p-3 flex-1 flex flex-col gap-4">
-        {selectedNodeId !== null ? (
-          <NodeProperties />
-        ) : selectedLinkId !== null ? (
-          <LinkProperties />
-        ) : (
-          <>
-            <AmbientSettings />
-            <div className="border-t border-slate-100 pt-3" />
-            <ContaminantPanel />
-            <div className="border-t border-slate-100 pt-3" />
-            <ScheduleEditor />
-            <div className="border-t border-slate-100 pt-3" />
-            <ControlPanel />
-            <div className="border-t border-slate-100 pt-3" />
-            <ModelSummary />
-            <div className="border-t border-slate-100 pt-3 text-xs text-slate-400 leading-relaxed">
-              选择房间或连接以编辑其属性。使用工具栏添加新元素。
-            </div>
-          </>
-        )}
-      </div>
+  return (
+    <aside className="bg-card flex flex-col h-full overflow-hidden">
+      {hasSelection ? (
+        /* When a node/link is selected, show its properties */
+        <div className="flex flex-col h-full">
+          <div className="px-3 py-2.5 border-b border-border">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">属性</h2>
+          </div>
+          <div className="p-3 flex-1 overflow-y-auto">
+            {selectedNodeId !== null ? <NodeProperties /> : <LinkProperties />}
+          </div>
+        </div>
+      ) : (
+        /* When nothing selected, show tabbed panels */
+        <Tabs defaultValue="model" className="flex flex-col h-full">
+          <div className="px-2 pt-2 border-b border-border shrink-0">
+            <TabsList className="w-full h-8">
+              <TabsTrigger value="model" className="flex-1 text-xs">模型</TabsTrigger>
+              <TabsTrigger value="contam" className="flex-1 text-xs">污染物</TabsTrigger>
+              <TabsTrigger value="schedule" className="flex-1 text-xs">排程</TabsTrigger>
+              <TabsTrigger value="control" className="flex-1 text-xs">控制</TabsTrigger>
+            </TabsList>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            <TabsContent value="model" className="mt-0">
+              <div className="flex flex-col gap-4">
+                <AmbientSettings />
+                <div className="border-t border-border" />
+                <ModelSummary />
+              </div>
+            </TabsContent>
+            <TabsContent value="contam" className="mt-0">
+              <ContaminantPanel />
+            </TabsContent>
+            <TabsContent value="schedule" className="mt-0">
+              <ScheduleEditor />
+            </TabsContent>
+            <TabsContent value="control" className="mt-0">
+              <ControlPanel />
+            </TabsContent>
+          </div>
+        </Tabs>
+      )}
     </aside>
   );
 }
