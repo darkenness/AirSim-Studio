@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import ContaminantPanel from '../ContaminantPanel/ContaminantPanel';
 import ModelSummary from '../ModelSummary/ModelSummary';
 import ScheduleEditor from '../ScheduleEditor/ScheduleEditor';
+import ScheduleGantt from '../ScheduleGantt/ScheduleGantt';
 import ControlPanel from '../ControlPanel/ControlPanel';
 import OccupantPanel from '../OccupantPanel/OccupantPanel';
 
@@ -417,6 +418,7 @@ export default function PropertyPanel() {
             </TabsContent>
             <TabsContent value="schedule" className="mt-0">
               <ScheduleEditor />
+              <ScheduleGantt />
             </TabsContent>
             <TabsContent value="control" className="mt-0">
               <ControlPanel />
