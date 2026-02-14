@@ -253,6 +253,7 @@ export default function SketchPad() {
               Fan: '风扇',
               Duct: '风管',
               Damper: '阀门',
+              Filter: '过滤器',
             };
             const typeTag = elemLabel[link.element.type] ?? link.element.type;
 

@@ -4,6 +4,7 @@ import { Trash2, Box, Cloud, Link2 } from 'lucide-react';
 import ContaminantPanel from '../ContaminantPanel/ContaminantPanel';
 import ModelSummary from '../ModelSummary/ModelSummary';
 import ScheduleEditor from '../ScheduleEditor/ScheduleEditor';
+import ControlPanel from '../ControlPanel/ControlPanel';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
   label: string; value: string | number; onChange: (v: string) => void; unit?: string; type?: string; step?: string;
@@ -308,6 +309,8 @@ export default function PropertyPanel() {
             <ContaminantPanel />
             <div className="border-t border-slate-100 pt-3" />
             <ScheduleEditor />
+            <div className="border-t border-slate-100 pt-3" />
+            <ControlPanel />
             <div className="border-t border-slate-100 pt-3" />
             <ModelSummary />
             <div className="border-t border-slate-100 pt-3 text-xs text-slate-400 leading-relaxed">

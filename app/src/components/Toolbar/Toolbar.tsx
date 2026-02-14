@@ -147,6 +147,13 @@ export default function Toolbar() {
         {isRunning ? '计算中...' : (isTransient ? '瞬态仿真' : '稳态求解')}
       </button>
 
+      {/* Progress bar */}
+      {isRunning && (
+        <div className="w-24 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{ width: '100%' }} />
+        </div>
+      )}
+
       {/* Undo/Redo */}
       <div className="w-px h-6 bg-slate-200 mx-1" />
       <button onClick={() => useAppStore.temporal.getState().undo()} title="撤销 (Ctrl+Z)" className="p-1.5 rounded-md text-slate-500 hover:bg-slate-50 hover:text-slate-700">
