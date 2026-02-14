@@ -1,4 +1,5 @@
 import { useAppStore } from '../../store/useAppStore';
+import { useCanvasStore } from '../../store/useCanvasStore';
 import { Plus, Trash2, FlaskConical, Flame, Clock } from 'lucide-react';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
@@ -9,7 +10,7 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
       <span className="text-[10px] font-semibold text-slate-500 tracking-wider">{label}</span>
       <div className="flex items-center gap-1">
         <input type={type} value={value} step={step} onChange={(e) => onChange(e.target.value)}
-          className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white" />
+          className="flex-1 px-2 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background" />
         {unit && <span className="text-[10px] text-slate-400 min-w-[24px]">{unit}</span>}
       </div>
     </label>
@@ -53,7 +54,7 @@ function SpeciesSection() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <FlaskConical size={14} className="text-purple-500" />
-        <span className="text-xs font-bold text-slate-700">污染物种类</span>
+        <span className="text-xs font-bold text-foreground">污染物种类</span>
         <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-purple-50 text-slate-400 hover:text-purple-500">
           <Plus size={14} />
         </button>
@@ -66,7 +67,7 @@ function SpeciesSection() {
             key={tpl.name}
             onClick={() => handleAddTemplate(tpl)}
             title={tpl.label}
-            className="px-1.5 py-0.5 text-[10px] bg-purple-50 hover:bg-purple-100 text-purple-700 rounded border border-purple-100 transition-colors"
+            className="px-1.5 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors"
           >
             + {tpl.name}
           </button>
@@ -74,7 +75,7 @@ function SpeciesSection() {
       </div>
 
       {species.length === 0 && (
-        <p className="text-[10px] text-slate-400 italic">点击上方按钮快速添加常见污染物，或点击 + 自定义添加。</p>
+        <p className="text-[10px] text-muted-foreground italic">点击上方按钮快速添加常见污染物，或点击 + 自定义添加。</p>
       )}
 
       {species.map((sp) => (
@@ -103,7 +104,18 @@ function SpeciesSection() {
 
 function SourceSection() {
   const { sources, addSource, removeSource, updateSource, nodes, species } = useAppStore();
-  const rooms = nodes.filter((n) => n.type === 'normal');
+  const canvasStories = useCanvasStore(s => s.stories);
+
+  // Unified room list: merge legacy AppStore nodes + canvas zone assignments
+  const legacyRooms = nodes.filter((n) => n.type === 'normal').map(n => ({ id: n.id, name: n.name }));
+  const canvasRooms = canvasStories.flatMap(s =>
+    s.zoneAssignments.map(z => ({ id: z.zoneId, name: z.name }))
+  );
+  // Deduplicate by ID, prefer canvas zones
+  const roomMap = new Map<number, { id: number; name: string }>();
+  for (const r of legacyRooms) roomMap.set(r.id, r);
+  for (const r of canvasRooms) roomMap.set(r.id, r);
+  const rooms = Array.from(roomMap.values());
 
   const handleAdd = () => {
     if (rooms.length === 0 || species.length === 0) return;
@@ -120,7 +132,7 @@ function SourceSection() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Flame size={14} className="text-orange-500" />
-        <span className="text-xs font-bold text-slate-700">源/汇</span>
+        <span className="text-xs font-bold text-foreground">源/汇</span>
         <button onClick={handleAdd} disabled={rooms.length === 0 || species.length === 0}
           className="ml-auto p-0.5 rounded hover:bg-orange-50 text-slate-400 hover:text-orange-500 disabled:opacity-30">
           <Plus size={14} />
@@ -137,7 +149,7 @@ function SourceSection() {
         const zone = nodes.find((n) => n.id === src.zoneId);
         const sp = species.find((s) => s.id === src.speciesId);
         return (
-          <div key={idx} className="border border-slate-100 rounded-md p-2 flex flex-col gap-1.5 bg-white">
+          <div key={idx} className="border border-border rounded-md p-2 flex flex-col gap-1.5 bg-card">
             <div className="flex items-center gap-1 text-[10px]">
               <span className="text-orange-500 font-bold">{zone?.name ?? `#${src.zoneId}`}</span>
               <span className="text-slate-300">→</span>
@@ -150,14 +162,14 @@ function SourceSection() {
               <label className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-semibold text-slate-500">区域</span>
                 <select value={src.zoneId} onChange={(e) => updateSource(idx, { zoneId: parseInt(e.target.value) })}
-                  className="px-1.5 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+                  className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
                   {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-0.5">
                 <span className="text-[10px] font-semibold text-slate-500">污染物</span>
                 <select value={src.speciesId} onChange={(e) => updateSource(idx, { speciesId: parseInt(e.target.value) })}
-                  className="px-1.5 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+                  className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
                   {species.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </label>

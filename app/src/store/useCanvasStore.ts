@@ -120,6 +120,17 @@ export interface CanvasState extends SelectionState, HoverState {
 
 let _nextZoneId = 100;
 
+/** Sync _nextZoneId to be above all existing zone IDs across all stories */
+function syncNextZoneId(stories: import('../model/geometry').Story[]) {
+  let maxId = 99;
+  for (const s of stories) {
+    for (const z of s.zoneAssignments) {
+      if (z.zoneId > maxId) maxId = z.zoneId;
+    }
+  }
+  _nextZoneId = maxId + 1;
+}
+
 export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
   // Mode
   appMode: 'edit',
@@ -244,6 +255,7 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     story.geometry = geo;
     story.zoneAssignments = newAssignments.filter(z => validFaceIds.has(z.faceId));
     stories[storyIdx] = story;
+    syncNextZoneId(stories);
 
     set({
       stories,
@@ -286,6 +298,7 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     story.geometry = geo;
     story.zoneAssignments = filteredAssignments;
     stories[storyIdx] = story;
+    syncNextZoneId(stories);
 
     return { stories };
   }),
@@ -457,12 +470,14 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
   // ── Clear ──
   clearAll: () => {
     _nextZoneId = 100;
+    const freshStory = createDefaultStory(0);
     set({
-      stories: [createDefaultStory(0)],
-      activeStoryId: '',
+      stories: [freshStory],
+      activeStoryId: freshStory.id,
       selectedEdgeId: null,
       selectedFaceId: null,
       selectedPlacementId: null,
+      selectedVertexId: null,
       wallPreview: { startX: 0, startY: 0, endX: 0, endY: 0, active: false },
       toolMode: 'select',
       appMode: 'edit',

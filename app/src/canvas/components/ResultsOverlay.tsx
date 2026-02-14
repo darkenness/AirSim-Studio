@@ -17,17 +17,24 @@ export function FlowArrows() {
 
   return (
     <group>
-      {story.placements.map((placement, placementIdx) => {
+      {story.placements.map((placement) => {
         const edge = geo.edges.find(e => e.id === placement.edgeId);
         if (!edge) return null;
 
         const pos = getPositionOnEdge(geo, edge, placement.alpha);
         if (!pos) return null;
 
-        // Map placement to link result: dataBridge assigns IDs starting at 10000
-        const expectedLinkId = 10000 + placementIdx;
-        const linkResult = result.links.find(l => l.id === expectedLinkId)
-          ?? result.links[placementIdx]; // fallback to index
+        // Match placement → link result via zone IDs on the edge's faces
+        const faceIds = edge.faceIds;
+        const z1 = faceIds[0] ? story.zoneAssignments.find(z => z.faceId === faceIds[0]) : undefined;
+        const z2 = faceIds[1] ? story.zoneAssignments.find(z => z.faceId === faceIds[1]) : undefined;
+        const fromId = z1?.zoneId ?? 0;
+        const toId = z2?.zoneId ?? 0;
+        if (fromId === toId) return null;
+
+        const linkResult = result.links.find(l =>
+          (l.from === fromId && l.to === toId) || (l.from === toId && l.to === fromId)
+        );
         if (!linkResult) return null;
 
         const flowMag = Math.abs(linkResult.massFlow);

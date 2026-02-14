@@ -23,7 +23,7 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
           value={value}
           step={step}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 focus:border-blue-400 bg-white"
+          className="flex-1 px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring bg-background"
         />
         {unit && <span className="text-[10px] text-slate-400 min-w-[24px]">{unit}</span>}
       </div>
@@ -41,11 +41,11 @@ function NodeProperties() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        {isAmbient ? <Cloud size={16} className="text-green-600" /> : <Box size={16} className="text-blue-600" />}
-        <span className="text-sm font-bold text-slate-700">{isAmbient ? '室外环境节点' : '房间 / 区域'}</span>
+        {isAmbient ? <Cloud size={16} className="text-primary" /> : <Box size={16} className="text-primary" />}
+        <span className="text-sm font-bold text-foreground">{isAmbient ? '室外环境节点' : '房间 / 区域'}</span>
         <button
           onClick={() => removeNode(node.id)}
-          className="ml-auto p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+          className="ml-auto p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
         >
           <Trash2 size={14} />
         </button>
@@ -101,17 +101,17 @@ function LinkProperties() {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
-        <Link2 size={16} className="text-slate-600" />
-        <span className="text-sm font-bold text-slate-700">气流路径</span>
+        <Link2 size={16} className="text-primary" />
+        <span className="text-sm font-bold text-foreground">气流路径</span>
         <button
           onClick={() => removeLink(link.id)}
-          className="ml-auto p-1 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+          className="ml-auto p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
         >
           <Trash2 size={14} />
         </button>
       </div>
 
-      <div className="text-xs text-slate-600 bg-slate-50 rounded px-2 py-1.5">
+      <div className="text-xs text-muted-foreground bg-muted rounded px-2 py-1.5">
         {fromNode?.name ?? `#${link.from}`} → {toNode?.name ?? `#${link.to}`}
       </div>
 
@@ -120,8 +120,8 @@ function LinkProperties() {
         onChange={(v) => updateLink(link.id, { elevation: parseFloat(v) || 0 })}
       />
 
-      <div className="border-t border-slate-100 pt-2 mt-1">
-        <span className="text-[10px] font-semibold text-slate-500 tracking-wider">气流元件</span>
+      <div className="border-t border-border pt-2 mt-1">
+        <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">气流元件</span>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -145,7 +145,7 @@ function LinkProperties() {
               };
               updateLink(link.id, { element: defaults[newType] ?? { type: newType } });
             }}
-            className="px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+            className="px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-background"
           >
             <option value="PowerLawOrifice">幂律孔口模型</option>
             <option value="TwoWayFlow">大开口 (双向流)</option>
