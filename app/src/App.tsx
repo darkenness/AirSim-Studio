@@ -10,10 +10,11 @@ import ResultsView from './components/ResultsView/ResultsView';
 import TransientChart from './components/TransientChart/TransientChart';
 import ExposureReport from './components/ExposureReport/ExposureReport';
 import StatusBar from './components/StatusBar/StatusBar';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useAppStore } from './store/useAppStore';
 import { useCanvasStore } from './store/useCanvasStore';
 import { useState, useCallback } from 'react';
-import { ChevronDown, ChevronUp, PanelRightOpen, PanelRightClose, Layers, GitBranch } from 'lucide-react';
+import { ChevronDown, ChevronUp, PanelRightOpen, PanelRightClose, Layers, GitBranch, Loader2 } from 'lucide-react';
 import { toast } from './hooks/use-toast';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './components/ui/tabs';
 
@@ -78,6 +79,19 @@ function BottomPanel() {
   );
 }
 
+function SimulationOverlay() {
+  const isRunning = useAppStore(s => s.isRunning);
+  if (!isRunning) return null;
+  return (
+    <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+      <div className="flex flex-col items-center gap-3 p-6 rounded-xl bg-card border border-border shadow-lg">
+        <Loader2 className="animate-spin text-primary" size={32} />
+        <span className="text-sm font-medium text-foreground">正在运行仿真...</span>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const { loadFromJson } = useAppStore();
   const sidebarOpen = useCanvasStore(s => s.sidebarOpen);
@@ -119,11 +133,13 @@ function App() {
         ) : (
           <div className="relative flex-1 min-h-0 overflow-hidden">
             {/* Full-screen canvas (z-0) */}
-            {activeView === 'canvas' ? (
-              <Canvas2D />
-            ) : (
-              <ControlFlowCanvas />
-            )}
+            <ErrorBoundary fallbackTitle="画布渲染出错">
+              {activeView === 'canvas' ? (
+                <Canvas2D />
+              ) : (
+                <ControlFlowCanvas />
+              )}
+            </ErrorBoundary>
 
             {/* Floating TopBar (z-20) */}
             <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
@@ -174,15 +190,22 @@ function App() {
                 sidebarOpen ? 'translate-x-0' : 'translate-x-full'
               }`}
             >
-              <PropertyPanel />
+              <ErrorBoundary fallbackTitle="属性面板出错">
+                <PropertyPanel />
+              </ErrorBoundary>
             </div>
 
             {/* Floating BottomBar (z-20) */}
             <div className="absolute bottom-8 left-3 right-3 z-20 max-w-[900px] mx-auto">
               <div className="rounded-xl border border-border shadow-xl overflow-hidden">
+              <ErrorBoundary fallbackTitle="结果面板出错">
                 <BottomPanel />
+              </ErrorBoundary>
               </div>
             </div>
+
+            {/* Simulation loading overlay (z-50) */}
+            <SimulationOverlay />
 
             {/* StatusBar at very bottom */}
             <div className="absolute bottom-0 left-0 right-0 z-10">

@@ -80,6 +80,8 @@ export interface Story {
     scalePixelsPerMeter: number;
     offsetX: number;
     offsetY: number;
+    rotation: 0 | 90 | 180 | 270;
+    locked: boolean;
   };
 }
 

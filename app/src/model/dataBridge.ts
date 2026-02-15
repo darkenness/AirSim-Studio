@@ -3,7 +3,7 @@
  * This is the critical link between the 2.5D visual editor and the C++ simulation engine.
  */
 
-import { faceArea, getEdge } from './geometry';
+import { faceArea, getEdge, edgeLength } from './geometry';
 import type { TopologyJson, FlowElementDef } from '../types';
 import { useCanvasStore } from '../store/useCanvasStore';
 import { useAppStore } from '../store/useAppStore';
@@ -28,10 +28,18 @@ const PLACEMENT_TO_ELEMENT: Record<string, () => FlowElementDef> = {
  * Convert all stories in the canvas to an engine-compatible TopologyJson.
  * This merges the geometry-based zones and placements with the existing
  * contaminant/schedule/control data from the old AppStore.
+ *
+ * scaleFactor is applied to convert grid units to physical meters:
+ *   - lengths (wall height, duct length, elevation) *= scaleFactor
+ *   - areas (face area, opening area) *= scaleFactor^2
+ *   - volumes *= scaleFactor^3
  */
 export function canvasToTopology(): TopologyJson {
   const canvasState = useCanvasStore.getState();
   const appState = useAppStore.getState();
+  const sf = canvasState.scaleFactor;
+  const sf2 = sf * sf;
+  const sf3 = sf * sf * sf;
 
   // Fallback: if canvas has no zones, use legacy AppStore topology
   const hasCanvasZones = canvasState.stories.some(s => s.geometry.faces.length > 0);
@@ -63,7 +71,7 @@ export function canvasToTopology(): TopologyJson {
       const face = geo.faces.find(f => f.id === zone.faceId);
       if (!face) continue;
 
-      const area = faceArea(geo, face);
+      const area = faceArea(geo, face) * sf2;
       const volume = area * story.floorToCeilingHeight;
 
       allNodes.push({
@@ -111,8 +119,17 @@ export function canvasToTopology(): TopologyJson {
         ? elementFactory()
         : { type: 'PowerLawOrifice', C: 0.001, n: 0.65 };
 
+      // Apply scale factor to geometry-dependent element properties
+      if (element.area !== undefined) element.area *= sf2;
+      if (element.height !== undefined) element.height *= sf;
+      if (element.length !== undefined) {
+        // For ducts, use actual edge length scaled
+        const len = edgeLength(geo, edge);
+        element.length = len * sf;
+      }
+
       // Calculate elevation from story level + half wall height
-      const linkElevation = story.level * story.floorToCeilingHeight + story.floorToCeilingHeight * 0.5;
+      const linkElevation = (story.level * story.floorToCeilingHeight + story.floorToCeilingHeight * 0.5) * sf;
 
       allLinks.push({
         id: nextLinkId++,

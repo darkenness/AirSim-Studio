@@ -4,7 +4,22 @@
  */
 
 import type { Camera2D } from './camera2d';
-import type { Geometry, EdgePlacement, ZoneAssignment } from '../model/geometry';
+import type { Geometry, GeoVertex, GeoEdge, EdgePlacement, ZoneAssignment } from '../model/geometry';
+import { faceArea, edgeLength, getFaceVertices } from '../model/geometry';
+
+// ── Lookup maps for O(1) vertex/edge access in hot paths ──
+
+interface GeoMaps {
+  vertexMap: Map<string, GeoVertex>;
+  edgeMap: Map<string, GeoEdge>;
+}
+
+function buildGeoMaps(geo: Geometry): GeoMaps {
+  return {
+    vertexMap: new Map(geo.vertices.map(v => [v.id, v])),
+    edgeMap: new Map(geo.edges.map(e => [e.id, e])),
+  };
+}
 
 // ── Theme colors read from CSS variables ──
 
@@ -167,10 +182,11 @@ export function drawWalls(
 ): void {
   const cx = canvasW / 2;
   const cy = canvasH / 2;
+  const { vertexMap } = buildGeoMaps(geo);
 
   for (const edge of geo.edges) {
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const sx1 = v1.x * camera.zoom + camera.panX + cx;
@@ -265,11 +281,13 @@ export function drawPlacements(
   const cx = canvasW / 2;
   const cy = canvasH / 2;
 
+  const { vertexMap, edgeMap } = buildGeoMaps(geo);
+
   for (const pl of placements) {
-    const edge = geo.edges.find(e => e.id === pl.edgeId);
+    const edge = edgeMap.get(pl.edgeId);
     if (!edge) continue;
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     // Position along edge
@@ -477,6 +495,7 @@ export function drawBackgroundImage(
   offsetX: number, offsetY: number,
   camera: Camera2D,
   canvasW: number, canvasH: number,
+  rotation: 0 | 90 | 180 | 270 = 0,
 ): void {
   const cx = canvasW / 2;
   const cy = canvasH / 2;
@@ -490,7 +509,21 @@ export function drawBackgroundImage(
   const sh = worldHeight * camera.zoom;
 
   ctx.globalAlpha = opacity;
-  ctx.drawImage(img, sx, sy, sw, sh);
+
+  if (rotation === 0) {
+    ctx.drawImage(img, sx, sy, sw, sh);
+  } else {
+    ctx.save();
+    const radians = (rotation * Math.PI) / 180;
+    // Rotate around the center of the image
+    const imgCx = sx + sw / 2;
+    const imgCy = sy + sh / 2;
+    ctx.translate(imgCx, imgCy);
+    ctx.rotate(radians);
+    ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+    ctx.restore();
+  }
+
   ctx.globalAlpha = 1.0;
 }
 
@@ -519,14 +552,15 @@ export function drawFlowArrows(
   if (flows.length === 0) return;
   const cx = canvasW / 2;
   const cy = canvasH / 2;
+  const { vertexMap, edgeMap } = buildGeoMaps(geo);
 
   const maxFlow = Math.max(1e-10, ...flows.map(f => Math.abs(f.massFlow)));
 
   for (const f of flows) {
-    const edge = geo.edges.find(e => e.id === f.edgeId);
+    const edge = edgeMap.get(f.edgeId);
     if (!edge) continue;
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const midWx = (v1.x + v2.x) / 2;
@@ -608,13 +642,14 @@ export function drawPressureLabels(
   if (flows.length === 0 || camera.zoom < 30) return;
   const cx = canvasW / 2;
   const cy = canvasH / 2;
+  const { vertexMap, edgeMap } = buildGeoMaps(geo);
 
   for (const f of flows) {
     if (Math.abs(f.deltaP) < 1e-6) continue;
-    const edge = geo.edges.find(e => e.id === f.edgeId);
+    const edge = edgeMap.get(f.edgeId);
     if (!edge) continue;
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const midSx = ((v1.x + v2.x) / 2) * camera.zoom + camera.panX + cx;
@@ -704,14 +739,15 @@ export function drawWindPressureVectors(
   if (cpData.length === 0 || windSpeed < 0.01) return;
   const cx = canvasW / 2;
   const cy = canvasH / 2;
+  const { vertexMap, edgeMap } = buildGeoMaps(geo);
 
   const maxCp = Math.max(0.01, ...cpData.map(d => Math.abs(d.cp)));
 
   for (const d of cpData) {
-    const edge = geo.edges.find(e => e.id === d.edgeId);
+    const edge = edgeMap.get(d.edgeId);
     if (!edge || !edge.isExterior) continue;
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const midWx = (v1.x + v2.x) / 2;
@@ -768,19 +804,161 @@ export function drawWindPressureVectors(
   }
 }
 
-// ── Helpers ──
+// ── Scaled dimension labels on walls ──
 
-function getFaceVertices(geo: Geometry, face: import('../model/geometry').GeoFace): { x: number; y: number }[] {
-  const pts: { x: number; y: number }[] = [];
-  for (let i = 0; i < face.edgeIds.length; i++) {
-    const edge = geo.edges.find(e => e.id === face.edgeIds[i]);
-    if (!edge) continue;
-    const vIdx = face.edgeOrder[i] === 0 ? 0 : 1;
-    const v = geo.vertices.find(v => v.id === edge.vertexIds[vIdx]);
-    if (v) pts.push({ x: v.x, y: v.y });
+export function drawWallDimensions(
+  ctx: CanvasRenderingContext2D,
+  geo: Geometry,
+  scaleFactor: number,
+  camera: Camera2D,
+  canvasW: number, canvasH: number,
+  colors: ThemeColors,
+): void {
+  if (camera.zoom < 18) return; // too zoomed out for labels
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const { vertexMap } = buildGeoMaps(geo);
+  const fontSize = Math.max(9, Math.min(12, camera.zoom * 0.16));
+
+  ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
+  ctx.fillStyle = colors.muted;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.globalAlpha = 0.75;
+
+  for (const edge of geo.edges) {
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
+    if (!v1 || !v2) continue;
+
+    const len = edgeLength(geo, edge);
+    if (len < 0.05) continue;
+
+    const physLen = len * scaleFactor;
+    const label = physLen < 1
+      ? `${(physLen * 100).toFixed(0)}cm`
+      : `${physLen.toFixed(2)}m`;
+
+    const sx1 = v1.x * camera.zoom + camera.panX + cx;
+    const sy1 = v1.y * camera.zoom + camera.panY + cy;
+    const sx2 = v2.x * camera.zoom + camera.panX + cx;
+    const sy2 = v2.y * camera.zoom + camera.panY + cy;
+    const midX = (sx1 + sx2) / 2;
+    const midY = (sy1 + sy2) / 2;
+
+    // Offset label perpendicular to edge so it doesn't overlap the wall
+    const edx = v2.x - v1.x;
+    const edy = v2.y - v1.y;
+    const elen = Math.sqrt(edx * edx + edy * edy);
+    const nx = elen > 0 ? -edy / elen : 0;
+    const ny = elen > 0 ? edx / elen : 0;
+    const offset = Math.max(8, camera.zoom * 0.15);
+
+    ctx.fillText(label, midX + nx * offset, midY + ny * offset);
   }
-  return pts;
+
+  ctx.globalAlpha = 1.0;
 }
+
+// ── Scaled area labels on zones ──
+
+export function drawZoneAreaLabels(
+  ctx: CanvasRenderingContext2D,
+  geo: Geometry,
+  zones: ZoneAssignment[],
+  scaleFactor: number,
+  camera: Camera2D,
+  canvasW: number, canvasH: number,
+  colors: ThemeColors,
+): void {
+  if (camera.zoom < 15) return;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const sf2 = scaleFactor * scaleFactor;
+
+  for (const face of geo.faces) {
+    const zone = zones.find(z => z.faceId === face.id);
+    if (!zone) continue;
+
+    const verts = getFaceVertices(geo, face);
+    if (verts.length < 3) continue;
+
+    const area = faceArea(geo, face) * sf2;
+    const centroid = getCentroid(verts);
+    const sx = centroid.x * camera.zoom + camera.panX + cx;
+    const sy = centroid.y * camera.zoom + camera.panY + cy;
+
+    const fontSize = Math.max(8, Math.min(11, camera.zoom * 0.18));
+    ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = colors.muted;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.globalAlpha = 0.65;
+    ctx.fillText(`${area.toFixed(1)} m²`, sx, sy + fontSize * 0.8);
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+// ── Calibration overlay (two-point line) ──
+
+export function drawCalibrationOverlay(
+  ctx: CanvasRenderingContext2D,
+  point1: { x: number; y: number } | null,
+  point2: { x: number; y: number } | null,
+  camera: Camera2D,
+  canvasW: number, canvasH: number,
+  colors: ThemeColors,
+): void {
+  if (!point1) return;
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+
+  const sx1 = point1.x * camera.zoom + camera.panX + cx;
+  const sy1 = point1.y * camera.zoom + camera.panY + cy;
+
+  // Draw first point marker
+  ctx.fillStyle = colors.destructive;
+  ctx.beginPath();
+  ctx.arc(sx1, sy1, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (point2) {
+    const sx2 = point2.x * camera.zoom + camera.panX + cx;
+    const sy2 = point2.y * camera.zoom + camera.panY + cy;
+
+    // Draw second point marker
+    ctx.beginPath();
+    ctx.arc(sx2, sy2, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw dashed line between points
+    ctx.setLineDash([6, 4]);
+    ctx.strokeStyle = colors.destructive;
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx2, sy2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Show grid distance label at midpoint
+    const dx = point2.x - point1.x;
+    const dy = point2.y - point1.y;
+    const gridDist = Math.sqrt(dx * dx + dy * dy);
+    const midX = (sx1 + sx2) / 2;
+    const midY = (sy1 + sy2) / 2;
+    const fontSize = Math.max(11, Math.min(14, camera.zoom * 0.22));
+    ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
+    ctx.fillStyle = colors.destructive;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${gridDist.toFixed(2)} grid units`, midX, midY - 6);
+    ctx.globalAlpha = 1.0;
+  }
+}
+
+// ── Helpers ──
 
 function getCentroid(pts: { x: number; y: number }[]): { x: number; y: number } {
   let sx = 0, sy = 0;

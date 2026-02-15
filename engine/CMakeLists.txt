@@ -99,8 +99,13 @@ set(ENGINE_SOURCES
     src/io/AchReport.cpp
     src/io/CsmReport.cpp
     src/io/CbwReport.cpp
+    src/io/LogReport.cpp
     src/io/CvfReader.cpp
     src/io/WpcReader.cpp
+    src/io/OneDOutput.cpp
+    src/io/ValReport.cpp
+    src/io/EbwReport.cpp
+    src/io/CexReport.cpp
 )
 
 if(CONTAM_ENABLE_HDF5)
@@ -156,6 +161,11 @@ add_executable(contam_tests
     test/test_validation.cpp
     test/test_p1_features.cpp
     test/test_phase6.cpp
+    test/test_log_report.cpp
+    test/test_oned_output.cpp
+    test/test_val_report.cpp
+    test/test_ebw_report.cpp
+    test/test_cex_report.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE

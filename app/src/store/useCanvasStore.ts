@@ -54,6 +54,10 @@ export interface CanvasState extends SelectionState, HoverState {
   snapToGrid: boolean;
   showGrid: boolean;
 
+  // Scale factor (pseudo-geometry)
+  scaleFactor: number;     // meters per grid unit (default 1.0 = 1:1)
+  calibrationPoints: [{ x: number; y: number }, { x: number; y: number }] | null;
+
   // Wall drawing
   wallPreview: WallPreview;
 
@@ -118,6 +122,11 @@ export interface CanvasState extends SelectionState, HoverState {
   setSnapToGrid: (snap: boolean) => void;
   setShowGrid: (show: boolean) => void;
 
+  // Actions - Scale factor
+  setScaleFactor: (factor: number) => void;
+  setCalibrationPoints: (points: [{ x: number; y: number }, { x: number; y: number }] | null) => void;
+  applyCalibration: (realWorldDistance: number) => void;
+
   // Actions - Camera
   setCameraZoom: (zoom: number) => void;
 
@@ -132,23 +141,22 @@ export interface CanvasState extends SelectionState, HoverState {
   setCurrentTransientStep: (step: number) => void;
 
   // Actions - Background image
-  setBackgroundImage: (storyId: string, image: { url: string; opacity: number; scalePixelsPerMeter: number; offsetX: number; offsetY: number } | undefined) => void;
+  setBackgroundImage: (storyId: string, image: { url: string; opacity: number; scalePixelsPerMeter: number; offsetX: number; offsetY: number; rotation: 0 | 90 | 180 | 270; locked: boolean } | undefined) => void;
+  updateBackgroundImage: (storyId: string, updates: Partial<NonNullable<Story['backgroundImage']>>) => void;
 
   // Actions - Serialization
   clearAll: () => void;
 }
 
-let _nextZoneId = 100;
-
-/** Sync _nextZoneId to be above all existing zone IDs across all stories */
-function syncNextZoneId(stories: import('../model/geometry').Story[]) {
+/** Derive next zone ID from current stories (always consistent, survives HMR) */
+function getNextZoneId(stories: import('../model/geometry').Story[]): number {
   let maxId = 99;
   for (const s of stories) {
     for (const z of s.zoneAssignments) {
       if (z.zoneId > maxId) maxId = z.zoneId;
     }
   }
-  _nextZoneId = maxId + 1;
+  return maxId + 1;
 }
 
 export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
@@ -177,6 +185,10 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
   gridSize: 0.1,
   snapToGrid: true,
   showGrid: true,
+
+  // Scale factor
+  scaleFactor: 1.0,
+  calibrationPoints: null,
 
   // Wall preview
   wallPreview: { startX: 0, startY: 0, endX: 0, endY: 0, active: false },
@@ -268,12 +280,13 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     // Auto-assign zones for new faces
     const existingFaceIds = new Set(story.zoneAssignments.map(z => z.faceId));
     const newAssignments = [...story.zoneAssignments];
+    let nextId = getNextZoneId(stories);
     for (const face of geo.faces) {
       if (!existingFaceIds.has(face.id)) {
         const area = faceArea(geo, face);
         newAssignments.push({
           faceId: face.id,
-          zoneId: _nextZoneId++,
+          zoneId: nextId++,
           name: `房间 ${newAssignments.length + 1}`,
           temperature: 293.15,
           volume: area * story.floorToCeilingHeight,
@@ -285,7 +298,6 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     story.geometry = geo;
     story.zoneAssignments = newAssignments.filter(z => validFaceIds.has(z.faceId));
     stories[storyIdx] = story;
-    syncNextZoneId(stories);
 
     set({
       stories,
@@ -308,12 +320,13 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     // Auto-assign zones for new faces
     const existingFaceIds = new Set(story.zoneAssignments.map(z => z.faceId));
     const newAssignments = [...story.zoneAssignments];
+    let nextId = getNextZoneId(stories);
     for (const face of geo.faces) {
       if (!existingFaceIds.has(face.id)) {
         const area = faceArea(geo, face);
         newAssignments.push({
           faceId: face.id,
-          zoneId: _nextZoneId++,
+          zoneId: nextId++,
           name: `房间 ${newAssignments.length + 1}`,
           temperature: 293.15,
           volume: area * story.floorToCeilingHeight,
@@ -328,7 +341,6 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     story.geometry = geo;
     story.zoneAssignments = filteredAssignments;
     stories[storyIdx] = story;
-    syncNextZoneId(stories);
 
     return { stories };
   }),
@@ -407,7 +419,7 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
     } else {
       story.zoneAssignments.push({
         faceId,
-        zoneId: _nextZoneId++,
+        zoneId: getNextZoneId(stories),
         name,
         temperature,
         volume: area * story.floorToCeilingHeight,
@@ -487,6 +499,21 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
   setSnapToGrid: (snap) => set({ snapToGrid: snap }),
   setShowGrid: (show) => set({ showGrid: show }),
 
+  // ── Scale factor ──
+  setScaleFactor: (factor) => set({ scaleFactor: Math.max(0.001, factor) }),
+  setCalibrationPoints: (points) => set({ calibrationPoints: points }),
+  applyCalibration: (realWorldDistance) => {
+    const state = get();
+    const pts = state.calibrationPoints;
+    if (!pts) return;
+    const dx = pts[1].x - pts[0].x;
+    const dy = pts[1].y - pts[0].y;
+    const gridDist = Math.sqrt(dx * dx + dy * dy);
+    if (gridDist < 1e-6) return;
+    const factor = realWorldDistance / gridDist;
+    set({ scaleFactor: Math.max(0.001, factor), calibrationPoints: null });
+  },
+
   // ── Camera ──
   setCameraZoom: (zoom) => set({ cameraZoom: zoom }),
 
@@ -506,10 +533,15 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
       s.id === storyId ? { ...s, backgroundImage: image } : s
     ),
   })),
+  updateBackgroundImage: (storyId, updates) => set((state) => ({
+    stories: state.stories.map(s => {
+      if (s.id !== storyId || !s.backgroundImage) return s;
+      return { ...s, backgroundImage: { ...s.backgroundImage, ...updates } };
+    }),
+  })),
 
   // ── Clear ──
   clearAll: () => {
-    _nextZoneId = 100;
     const freshStory = createDefaultStory(0);
     set({
       stories: [freshStory],
@@ -521,6 +553,8 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
       wallPreview: { startX: 0, startY: 0, endX: 0, endY: 0, active: false },
       toolMode: 'select',
       appMode: 'edit',
+      scaleFactor: 1.0,
+      calibrationPoints: null,
     });
   },
 }), { limit: 100 }));

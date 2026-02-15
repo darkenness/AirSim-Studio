@@ -24,6 +24,7 @@ import {
   drawCrosshair, readThemeColors,
   drawFlowArrows, drawPressureLabels, drawConcentrationHeatmap,
   drawBackgroundImage, drawWindPressureVectors,
+  drawWallDimensions, drawZoneAreaLabels, drawCalibrationOverlay,
   type ThemeColors,
   type EdgeFlowResult,
   type ZoneConcentrationResult,
@@ -38,6 +39,8 @@ import { FloorSwitcher } from './components/FloorSwitcher';
 import { ZoomControls } from './components/ZoomControls';
 import { TimeStepper } from './components/TimeStepper';
 import { FloatingStatusBox } from './components/FloatingStatusBox';
+import { TracingImageControls } from './components/TracingImageControls';
+import { ScaleFactorControl } from './components/ScaleFactorControl';
 
 export default function Canvas2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -155,7 +158,7 @@ export default function Canvas2D() {
         drawBackgroundImage(ctx, bgImg, story.backgroundImage.opacity,
           story.backgroundImage.scalePixelsPerMeter,
           story.backgroundImage.offsetX, story.backgroundImage.offsetY,
-          camera, cssW, cssH);
+          camera, cssW, cssH, story.backgroundImage.rotation ?? 0);
       }
     }
 
@@ -214,19 +217,18 @@ export default function Canvas2D() {
         if (step) {
           // Build edge flows from transient massFlows
           const edgeFlows: EdgeFlowResult[] = [];
+          const edgeMap = new Map(geo.edges.map(e => [e.id, e]));
+          const faceToZone = new Map(story.zoneAssignments.map(z => [z.faceId, z]));
           for (const placement of story.placements) {
-            const edge = geo.edges.find(e => e.id === placement.edgeId);
+            const edge = edgeMap.get(placement.edgeId);
             if (!edge) continue;
             const faceIds = edge.faceIds;
             let fromZoneId = 0, toZoneId = 0;
             if (faceIds.length === 2) {
-              const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
-              const z2 = story.zoneAssignments.find(z => z.faceId === faceIds[1]);
-              fromZoneId = z1?.zoneId ?? 0;
-              toZoneId = z2?.zoneId ?? 0;
+              fromZoneId = faceToZone.get(faceIds[0])?.zoneId ?? 0;
+              toZoneId = faceToZone.get(faceIds[1])?.zoneId ?? 0;
             } else if (faceIds.length === 1) {
-              const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
-              fromZoneId = z1?.zoneId ?? 0;
+              fromZoneId = faceToZone.get(faceIds[0])?.zoneId ?? 0;
             }
             // Find link index matching this zone pair
             const linkIdx = appState.links.findIndex(l =>
@@ -279,25 +281,24 @@ export default function Canvas2D() {
 
         // Build zoneId→faceId lookup from zone assignments
         const zoneIdToFaceId = new Map<number, string>();
+        const faceToZoneSS = new Map(story.zoneAssignments.map(z => [z.faceId, z]));
         for (const z of story.zoneAssignments) {
           zoneIdToFaceId.set(z.zoneId, z.faceId);
         }
 
         // Build edge→(fromZoneId, toZoneId) lookup from placements
+        const edgeMapSS = new Map(geo.edges.map(e => [e.id, e]));
         for (const placement of story.placements) {
-          const edge = geo.edges.find(e => e.id === placement.edgeId);
+          const edge = edgeMapSS.get(placement.edgeId);
           if (!edge) continue;
 
           const faceIds = edge.faceIds;
           let fromZoneId = 0, toZoneId = 0;
           if (faceIds.length === 2) {
-            const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
-            const z2 = story.zoneAssignments.find(z => z.faceId === faceIds[1]);
-            fromZoneId = z1?.zoneId ?? 0;
-            toZoneId = z2?.zoneId ?? 0;
+            fromZoneId = faceToZoneSS.get(faceIds[0])?.zoneId ?? 0;
+            toZoneId = faceToZoneSS.get(faceIds[1])?.zoneId ?? 0;
           } else if (faceIds.length === 1) {
-            const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
-            fromZoneId = z1?.zoneId ?? 0;
+            fromZoneId = faceToZoneSS.get(faceIds[0])?.zoneId ?? 0;
             toZoneId = 0;
           }
 
@@ -342,10 +343,11 @@ export default function Canvas2D() {
         const windDirection = appState.windDirection;
         if (windSpeed > 0.01) {
           const cpData: WallCpData[] = [];
+          const vertexMapWind = new Map(geo.vertices.map(v => [v.id, v]));
           for (const edge of geo.edges) {
             if (!edge.isExterior) continue;
-            const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-            const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+            const v1 = vertexMapWind.get(edge.vertexIds[0]);
+            const v2 = vertexMapWind.get(edge.vertexIds[1]);
             if (!v1 || !v2) continue;
             const edx = v2.x - v1.x;
             const edy = v2.y - v1.y;
@@ -357,6 +359,21 @@ export default function Canvas2D() {
           drawWindPressureVectors(ctx, geo, cpData, windDirection, windSpeed, camera, cssW, cssH, colors);
         }
       }
+    }
+
+    // 10. Scaled dimension labels (wall lengths + zone areas)
+    const sf = state.scaleFactor;
+    if (sf !== 1.0 || state.appMode === 'edit') {
+      drawWallDimensions(ctx, geo, sf, camera, cssW, cssH, colors);
+      drawZoneAreaLabels(ctx, geo, story.zoneAssignments, sf, camera, cssW, cssH, colors);
+    }
+
+    // 11. Calibration overlay
+    if (state.calibrationPoints) {
+      const [p1, p2] = state.calibrationPoints;
+      const validP1 = p1 && !isNaN(p1.x) ? p1 : null;
+      const validP2 = p2 && !isNaN(p2.x) ? p2 : null;
+      drawCalibrationOverlay(ctx, validP1, validP2, camera, cssW, cssH, colors);
     }
 
     rafRef.current = requestAnimationFrame(render);
@@ -423,6 +440,16 @@ export default function Canvas2D() {
     }
 
     if (e.button !== 0) return; // left click only below
+
+    // Tracing image calibration mode: intercept clicks for two-point calibration
+    if ((state as any)._tracingCalibrationActive) {
+      const addPoint = (window as any).__tracingCalibrationAddPoint;
+      if (typeof addPoint === 'function') {
+        addPoint(wx, wy);
+      }
+      dirtyRef.current = true;
+      return;
+    }
 
     const snapThreshold = screenDistToWorld(12, cameraRef.current.zoom);
 
@@ -708,6 +735,8 @@ export default function Canvas2D() {
       <FloorSwitcher />
       <TimeStepper />
       <FloatingStatusBox />
+      <TracingImageControls />
+      <ScaleFactorControl />
       <CanvasContextMenu />
     </div>
   );

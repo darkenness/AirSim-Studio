@@ -5,7 +5,18 @@
 
 import type { Camera2D } from './camera2d';
 import { snapToGrid } from './camera2d';
-import type { Geometry, GeoVertex } from '../model/geometry';
+import type { Geometry, GeoVertex, GeoEdge } from '../model/geometry';
+import { getFaceVertices } from '../model/geometry';
+
+// ── Lookup maps for O(1) vertex/edge access in hot paths ──
+
+function buildVertexMap(geo: Geometry): Map<string, GeoVertex> {
+  return new Map(geo.vertices.map(v => [v.id, v]));
+}
+
+function buildEdgeMap(geo: Geometry): Map<string, GeoEdge> {
+  return new Map(geo.edges.map(e => [e.id, e]));
+}
 
 // ── Orthogonal constraint ──
 
@@ -78,10 +89,11 @@ export function hitTestEdge(
   camera: Camera2D,
 ): string | null {
   const toleranceWorld = EDGE_HIT_TOLERANCE_PX / camera.zoom;
+  const vertexMap = buildVertexMap(geo);
 
   for (const edge of geo.edges) {
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const dist = pointToSegmentDist(wx, wy, v1.x, v1.y, v2.x, v2.y);
@@ -117,12 +129,14 @@ export function hitTestPlacement(
   camera: Camera2D,
 ): string | null {
   const toleranceWorld = 10 / camera.zoom; // 10px tolerance
+  const vertexMap = buildVertexMap(geo);
+  const edgeMap = buildEdgeMap(geo);
 
   for (const pl of placements) {
-    const edge = geo.edges.find(e => e.id === pl.edgeId);
+    const edge = edgeMap.get(pl.edgeId);
     if (!edge) continue;
-    const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-    const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
     if (!v1 || !v2) continue;
 
     const px = v1.x + (v2.x - v1.x) * pl.alpha;
@@ -163,10 +177,12 @@ export function computeAlphaOnEdge(
   edgeId: string,
   wx: number, wy: number,
 ): number {
-  const edge = geo.edges.find(e => e.id === edgeId);
+  const edgeMap = buildEdgeMap(geo);
+  const vertexMap = buildVertexMap(geo);
+  const edge = edgeMap.get(edgeId);
   if (!edge) return 0.5;
-  const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
-  const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+  const v1 = vertexMap.get(edge.vertexIds[0]);
+  const v2 = vertexMap.get(edge.vertexIds[1]);
   if (!v1 || !v2) return 0.5;
 
   const dx = v2.x - v1.x;
@@ -195,18 +211,6 @@ function pointToSegmentDist(
   const cx = ax + t * dx;
   const cy = ay + t * dy;
   return Math.sqrt((px - cx) ** 2 + (py - cy) ** 2);
-}
-
-function getFaceVertices(geo: Geometry, face: import('../model/geometry').GeoFace): { x: number; y: number }[] {
-  const pts: { x: number; y: number }[] = [];
-  for (let i = 0; i < face.edgeIds.length; i++) {
-    const edge = geo.edges.find(e => e.id === face.edgeIds[i]);
-    if (!edge) continue;
-    const vIdx = face.edgeOrder[i] === 0 ? 0 : 1;
-    const v = geo.vertices.find(v => v.id === edge.vertexIds[vIdx]);
-    if (v) pts.push({ x: v.x, y: v.y });
-  }
-  return pts;
 }
 
 function pointInPolygon(px: number, py: number, polygon: { x: number; y: number }[]): boolean {
