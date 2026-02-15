@@ -299,3 +299,453 @@ TEST(JsonReaderTest, LeakageAreaElement) {
     EXPECT_NE(elem, nullptr);
     EXPECT_EQ(elem->typeName(), "PowerLawOrifice");
 }
+
+// ============================================================================
+// Case 02: Single room CO2 transient validation
+// ============================================================================
+// Topology: 1 room (Office, 60m³) + Ambient, 2 cracks
+// Driving force: stack effect (indoor 293.15K, outdoor 273.15K), no wind
+// CO2 source: 5e-6 kg/s with schedule (off 0-300s, on 360-1800s, off 1860-3600s)
+// Transient: 0-3600s, dt=30s, output every 60s
+// Verification: airflow convergence, concentration accuracy, mass conservation
+
+TEST(ValidationCase02, Converges) {
+    auto model = JsonReader::readModelFromFile("../../validation/case02_co2_source/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    EXPECT_GT(result.timeSteps.size(), 0);
+
+    // Check first step converged
+    EXPECT_TRUE(result.timeSteps[0].converged);
+    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+}
+
+TEST(ValidationCase02, AirflowAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case02_co2_source/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    ASSERT_GT(result.timeSteps.size(), 0);
+
+    // Reference airflow at first step (constant throughout)
+    std::vector<double> refMassFlows = {0.002271335797949386, 0.0022713302524782785};
+    std::vector<double> refPressures = {0.0, -1.2971159249570685};
+
+    auto& firstStep = result.timeSteps[0];
+    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+
+    // Check mass flows (1e-4 relative tolerance)
+    for (size_t i = 0; i < refMassFlows.size(); ++i) {
+        double relTol = std::abs(refMassFlows[i]) * 1e-4;
+        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+            << "Mass flow mismatch at link " << i;
+    }
+
+    // Check pressures
+    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    for (size_t i = 0; i < refPressures.size(); ++i) {
+        if (std::abs(refPressures[i]) < 1e-6) {
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+        } else {
+            double relTol = std::abs(refPressures[i]) * 1e-4;
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+                << "Pressure mismatch at node " << i;
+        }
+    }
+}
+
+TEST(ValidationCase02, ConcentrationAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case02_co2_source/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    // Find t=1800s step (peak source)
+    auto it1800 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+        [](const auto& step) { return std::abs(step.time - 1800.0) < 1e-3; });
+    ASSERT_NE(it1800, result.timeSteps.end());
+
+    // Reference CO2 at t=1800s: Office conc = 0.00015774366850436868
+    double refConc1800 = 0.00015774366850436868;
+    ASSERT_GT(it1800->concentrations.size(), 0);
+    ASSERT_GT(it1800->concentrations[0].size(), 1);  // Node 1 (Office), species 0 (CO2)
+    double actualConc1800 = it1800->concentrations[0][1];
+    double relTol1800 = refConc1800 * 0.01;  // 1% tolerance
+    EXPECT_NEAR(actualConc1800, refConc1800, relTol1800)
+        << "CO2 concentration mismatch at t=1800s";
+
+    // Find t=3600s step (end, source off since 1860s)
+    auto it3600 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+        [](const auto& step) { return std::abs(step.time - 3600.0) < 1e-3; });
+    ASSERT_NE(it3600, result.timeSteps.end());
+
+    // Reference CO2 at t=3600s: Office conc = 0.00018714391510893705
+    double refConc3600 = 0.00018714391510893705;
+    double actualConc3600 = it3600->concentrations[0][1];
+    double relTol3600 = refConc3600 * 0.01;
+    EXPECT_NEAR(actualConc3600, refConc3600, relTol3600)
+        << "CO2 concentration mismatch at t=3600s";
+}
+
+TEST(ValidationCase02, MassConservation) {
+    auto model = JsonReader::readModelFromFile("../../validation/case02_co2_source/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    int numNodes = model.network.getNodeCount();
+
+    // Check mass conservation at each time step
+    for (const auto& step : result.timeSteps) {
+        std::vector<double> netFlow(numNodes, 0.0);
+
+        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+            int from = model.network.getLink(i).getNodeFrom();
+            int to = model.network.getLink(i).getNodeTo();
+            double flow = step.massFlows[i];
+            netFlow[from] -= flow;
+            netFlow[to] += flow;
+        }
+
+        // Each non-ambient node should have net flow ≈ 0
+        for (int i = 0; i < numNodes; ++i) {
+            if (!model.network.getNode(i).isKnownPressure()) {
+                EXPECT_NEAR(netFlow[i], 0.0, 1e-6)
+                    << "Mass conservation violated at node " << i
+                    << " at time " << step.time << "s";
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Case 03: Fan-driven ventilation with duct validation
+// ============================================================================
+// Topology: Office (60m³) + Corridor (40m³) + Ambient
+// Elements: supply_fan, exhaust_duct, door (TwoWayFlow), crack
+// CO2 source: 8e-6 kg/s in Office (constant)
+// Transient: 0-3600s, dt=30s, output every 60s
+// Verification: fan operation, duct resistance, concentration accuracy
+
+TEST(ValidationCase03, Converges) {
+    auto model = JsonReader::readModelFromFile("../../validation/case03_fan_duct/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    EXPECT_GT(result.timeSteps.size(), 0);
+
+    // Check first step converged
+    EXPECT_TRUE(result.timeSteps[0].converged);
+    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+}
+
+TEST(ValidationCase03, AirflowAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case03_fan_duct/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    ASSERT_GT(result.timeSteps.size(), 0);
+
+    // Reference airflow (steady-state)
+    std::vector<double> refMassFlows = {
+        0.06766392356111356,   // Fan: Amb→Office
+        0.059066503143075114,  // Door: Office→Corridor
+        0.05906647203571158,   // Duct: Corridor→Amb
+        0.008597417236456427   // Crack: Office→Amb
+    };
+    std::vector<double> refPressures = {
+        0.0,                   // Ambient
+        19.820511643800145,    // Office
+        11.358868725428604     // Corridor
+    };
+
+    auto& firstStep = result.timeSteps[0];
+    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+
+    // Check mass flows
+    for (size_t i = 0; i < refMassFlows.size(); ++i) {
+        double relTol = std::abs(refMassFlows[i]) * 1e-4;
+        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+            << "Mass flow mismatch at link " << i;
+    }
+
+    // Check pressures
+    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    for (size_t i = 0; i < refPressures.size(); ++i) {
+        if (std::abs(refPressures[i]) < 1e-6) {
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+        } else {
+            double relTol = std::abs(refPressures[i]) * 1e-4;
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+                << "Pressure mismatch at node " << i;
+        }
+    }
+}
+
+TEST(ValidationCase03, ConcentrationAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case03_fan_duct/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    // Find t=3600s step (final)
+    auto it3600 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+        [](const auto& step) { return std::abs(step.time - 3600.0) < 1e-3; });
+    ASSERT_NE(it3600, result.timeSteps.end());
+
+    // Reference CO2 at t=3600s
+    double refOfficeConc = 0.0008078077413932571;
+    double refCorridorConc = 0.0007501299758226876;
+
+    ASSERT_GT(it3600->concentrations.size(), 0);
+    ASSERT_GE(it3600->concentrations[0].size(), 3);  // Nodes 0,1,2
+
+    double actualOfficeConc = it3600->concentrations[0][1];    // Node 1 (Office)
+    double actualCorridorConc = it3600->concentrations[0][2];  // Node 2 (Corridor)
+
+    double relTolOffice = refOfficeConc * 0.01;
+    double relTolCorridor = refCorridorConc * 0.01;
+
+    EXPECT_NEAR(actualOfficeConc, refOfficeConc, relTolOffice)
+        << "Office CO2 concentration mismatch at t=3600s";
+    EXPECT_NEAR(actualCorridorConc, refCorridorConc, relTolCorridor)
+        << "Corridor CO2 concentration mismatch at t=3600s";
+}
+
+TEST(ValidationCase03, MassConservation) {
+    auto model = JsonReader::readModelFromFile("../../validation/case03_fan_duct/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    int numNodes = model.network.getNodeCount();
+
+    for (const auto& step : result.timeSteps) {
+        std::vector<double> netFlow(numNodes, 0.0);
+
+        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+            int from = model.network.getLink(i).getNodeFrom();
+            int to = model.network.getLink(i).getNodeTo();
+            double flow = step.massFlows[i];
+            netFlow[from] -= flow;
+            netFlow[to] += flow;
+        }
+
+        for (int i = 0; i < numNodes; ++i) {
+            if (!model.network.getNode(i).isKnownPressure()) {
+                EXPECT_NEAR(netFlow[i], 0.0, 1e-6)
+                    << "Mass conservation violated at node " << i
+                    << " at time " << step.time << "s";
+            }
+        }
+    }
+}
+
+// ============================================================================
+// Case 04: Multi-zone with all element types validation
+// ============================================================================
+// Topology: Office A (45m³) + Office B (55m³) + Corridor (30m³) + Ambient
+// Elements: supply_fan, supply_duct, exhaust_duct, office_door (x2),
+//           corridor_damper, window_crack, facade_crack
+// 2 species: CO2 + PM2.5 (with decay 0.0001)
+// CO2 sources: 6e-6 in Office A, 8e-6 in Office B
+// Transient: 0-7200s, dt=30s, output every 120s
+// Verification: multi-species transport, decay, complex topology
+
+TEST(ValidationCase04, Converges) {
+    auto model = JsonReader::readModelFromFile("../../validation/case04_multizone/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    EXPECT_GT(result.timeSteps.size(), 0);
+
+    // Check first step converged
+    EXPECT_TRUE(result.timeSteps[0].converged);
+    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+}
+
+TEST(ValidationCase04, AirflowAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case04_multizone/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+    ASSERT_GT(result.timeSteps.size(), 0);
+
+    // Reference airflow (steady-state)
+    std::vector<double> refMassFlows = {
+        0.10132547778346775,   // supply_fan
+        -0.06664655379020709,  // supply_duct
+        0.03281810000224549,   // exhaust_duct
+        -0.0010610618443331994,// office_door_A
+        -0.0010654535327370676,// office_door_B
+        0.028500448735391027,  // corridor_damper
+        0.003252215944880021,  // window_crack
+        0.0018608267060884834  // facade_crack
+    };
+    std::vector<double> refPressures = {
+        0.0,                   // Ambient
+        5.116779015247205,     // Office A
+        0.4469147852604575,    // Office B
+        0.5730967623578821     // Corridor
+    };
+
+    auto& firstStep = result.timeSteps[0];
+    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+
+    // Check mass flows
+    for (size_t i = 0; i < refMassFlows.size(); ++i) {
+        double relTol = std::abs(refMassFlows[i]) * 1e-4;
+        if (relTol < 1e-9) relTol = 1e-9;  // Minimum absolute tolerance
+        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+            << "Mass flow mismatch at link " << i;
+    }
+
+    // Check pressures
+    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    for (size_t i = 0; i < refPressures.size(); ++i) {
+        if (std::abs(refPressures[i]) < 1e-6) {
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+        } else {
+            double relTol = std::abs(refPressures[i]) * 1e-4;
+            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+                << "Pressure mismatch at node " << i;
+        }
+    }
+}
+
+TEST(ValidationCase04, ConcentrationAccuracy) {
+    auto model = JsonReader::readModelFromFile("../../validation/case04_multizone/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    // Find t=7200s step (final)
+    auto it7200 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+        [](const auto& step) { return std::abs(step.time - 7200.0) < 1e-3; });
+    ASSERT_NE(it7200, result.timeSteps.end());
+
+    // Reference CO2 at t=7200s
+    double refOfficeAConc = 0.0007493835916719974;
+    double refOfficeBConc = 0.0010526575083065054;
+    double refCorridorConc = 0.000757347777498626;
+
+    ASSERT_GT(it7200->concentrations.size(), 0);  // At least 1 species (CO2)
+    ASSERT_GE(it7200->concentrations[0].size(), 4);  // Nodes 0,1,2,3
+
+    double actualOfficeAConc = it7200->concentrations[0][1];   // Node 1 (Office A)
+    double actualOfficeBConc = it7200->concentrations[0][2];   // Node 2 (Office B)
+    double actualCorridorConc = it7200->concentrations[0][3];  // Node 3 (Corridor)
+
+    double relTolA = refOfficeAConc * 0.01;
+    double relTolB = refOfficeBConc * 0.01;
+    double relTolC = refCorridorConc * 0.01;
+
+    EXPECT_NEAR(actualOfficeAConc, refOfficeAConc, relTolA)
+        << "Office A CO2 concentration mismatch at t=7200s";
+    EXPECT_NEAR(actualOfficeBConc, refOfficeBConc, relTolB)
+        << "Office B CO2 concentration mismatch at t=7200s";
+    EXPECT_NEAR(actualCorridorConc, refCorridorConc, relTolC)
+        << "Corridor CO2 concentration mismatch at t=7200s";
+}
+
+TEST(ValidationCase04, MassConservation) {
+    auto model = JsonReader::readModelFromFile("../../validation/case04_multizone/input.json");
+
+    TransientSimulation sim;
+    sim.setConfig(model.transientConfig);
+    sim.setSpecies(model.species);
+    sim.setSources(model.sources);
+    sim.setSchedules(model.schedules);
+
+    auto result = sim.run(model.network);
+    ASSERT_TRUE(result.completed);
+
+    int numNodes = model.network.getNodeCount();
+
+    for (const auto& step : result.timeSteps) {
+        std::vector<double> netFlow(numNodes, 0.0);
+
+        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+            int from = model.network.getLink(i).getNodeFrom();
+            int to = model.network.getLink(i).getNodeTo();
+            double flow = step.massFlows[i];
+            netFlow[from] -= flow;
+            netFlow[to] += flow;
+        }
+
+        for (int i = 0; i < numNodes; ++i) {
+            if (!model.network.getNode(i).isKnownPressure()) {
+                EXPECT_NEAR(netFlow[i], 0.0, 1e-6)
+                    << "Mass conservation violated at node " << i
+                    << " at time " << step.time << "s";
+            }
+        }
+    }
+}
