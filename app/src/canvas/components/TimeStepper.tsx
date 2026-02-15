@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { Button } from '../../components/ui/button';
@@ -16,7 +16,8 @@ export function TimeStepper() {
   const appMode = useCanvasStore(s => s.appMode);
   const setAppMode = useCanvasStore(s => s.setAppMode);
 
-  const [currentStep, setCurrentStep] = useState(0);
+  const currentStep = useCanvasStore(s => s.currentTransientStep);
+  const setCurrentStep = useCanvasStore(s => s.setCurrentTransientStep);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);

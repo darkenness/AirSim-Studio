@@ -93,10 +93,23 @@ set(ENGINE_SOURCES
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
     src/utils/Constants.cpp
+    src/core/OneDZone.cpp
+    src/core/AdaptiveIntegrator.cpp
+    src/core/DuctNetwork.cpp
+    src/io/AchReport.cpp
+    src/io/CsmReport.cpp
 )
 
 if(CONTAM_ENABLE_HDF5)
     list(APPEND ENGINE_SOURCES src/io/Hdf5Writer.cpp)
+endif()
+
+# Optional SQLite3
+option(CONTAM_ENABLE_SQLITE3 "Enable SQLite3 output support" OFF)
+
+if(CONTAM_ENABLE_SQLITE3)
+    find_package(SQLite3 REQUIRED)
+    list(APPEND ENGINE_SOURCES src/io/SqliteWriter.cpp)
 endif()
 
 add_library(contam_engine_lib STATIC ${ENGINE_SOURCES})
@@ -116,6 +129,11 @@ if(CONTAM_ENABLE_HDF5)
     target_include_directories(contam_engine_lib PUBLIC ${HDF5_INCLUDE_DIRS})
 endif()
 
+if(CONTAM_ENABLE_SQLITE3)
+    target_compile_definitions(contam_engine_lib PRIVATE CONTAM_HAS_SQLITE3)
+    target_link_libraries(contam_engine_lib PRIVATE SQLite::SQLite3)
+endif()
+
 # ── CLI Executable ─────────────────────────────────────────────────────
 add_executable(contam_engine src/main.cpp)
 target_link_libraries(contam_engine PRIVATE contam_engine_lib)
@@ -133,6 +151,7 @@ add_executable(contam_tests
     test/test_control.cpp
     test/test_advanced.cpp
     test/test_validation.cpp
+    test/test_p1_features.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE

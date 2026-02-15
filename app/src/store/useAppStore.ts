@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, WeekSchedule, DayType } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, WeekSchedule, DayType, FilterConfig } from '../types';
 
 export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Model data
@@ -30,6 +30,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Weather & AHS
   weatherConfig: { enabled: false, filePath: '', records: [] },
   ahsSystems: [],
+  filterConfigs: [],
 
   // Simulation
   result: null,
@@ -158,6 +159,14 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
     ahsSystems: state.ahsSystems.filter((a) => a.id !== id),
   })),
 
+  addFilterConfig: (fc) => set((state) => ({ filterConfigs: [...state.filterConfigs, fc] })),
+  updateFilterConfig: (id, updates) => set((state) => ({
+    filterConfigs: state.filterConfigs.map(f => f.id === id ? { ...f, ...updates } as FilterConfig : f),
+  })),
+  removeFilterConfig: (id) => set((state) => ({
+    filterConfigs: state.filterConfigs.filter(f => f.id !== id),
+  })),
+
   exportTopology: (): TopologyJson => {
     const state = get();
     const ambientNodes = state.nodes.filter((n) => n.type === 'ambient');
@@ -254,6 +263,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
       transientConfig: json.transient ?? { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
       weatherConfig: json.weather ?? { enabled: false, filePath: '', records: [] },
       ahsSystems: json.ahsSystems ?? [],
+      filterConfigs: [],
       result: null,
       transientResult: null,
       error: null,
@@ -273,6 +283,7 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
     selectedLinkId: null,
     weatherConfig: { enabled: false, filePath: '', records: [] },
     ahsSystems: [],
+    filterConfigs: [],
     result: null,
     transientResult: null,
     error: null,

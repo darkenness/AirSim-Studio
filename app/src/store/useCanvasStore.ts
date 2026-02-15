@@ -67,6 +67,9 @@ export interface CanvasState extends SelectionState, HoverState {
   // Snap feedback
   snapVertexId: string | null;  // currently snapped vertex for visual feedback
 
+  // Transient playback
+  currentTransientStep: number;
+
   // Actions - Mode
   setAppMode: (mode: AppMode) => void;
   setToolMode: (mode: ToolMode) => void;
@@ -124,6 +127,9 @@ export interface CanvasState extends SelectionState, HoverState {
 
   // Actions - Display
   setSnapVertexId: (id: string | null) => void;
+
+  // Actions - Transient playback
+  setCurrentTransientStep: (step: number) => void;
 
   // Actions - Background image
   setBackgroundImage: (storyId: string, image: { url: string; opacity: number; scalePixelsPerMeter: number; offsetX: number; offsetY: number } | undefined) => void;
@@ -184,6 +190,9 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
 
   // Display
   snapVertexId: null,
+
+  // Transient playback
+  currentTransientStep: 0,
 
   // ── Mode actions ──
   setAppMode: (mode) => set({ appMode: mode }),
@@ -487,6 +496,9 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => ({
 
   // ── Display ──
   setSnapVertexId: (id) => set({ snapVertexId: id }),
+
+  // ── Transient playback ──
+  setCurrentTransientStep: (step) => set({ currentTransientStep: step }),
 
   // ── Background image ──
   setBackgroundImage: (storyId, image) => set((state) => ({

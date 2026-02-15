@@ -286,6 +286,50 @@ export interface AHSConfig {
   supplyFlowScheduleId: number;  // -1 = constant
 }
 
+// ── Filter Configuration ──────────────────────────────────────────
+export interface LoadingPoint {
+  loading: number;     // cumulative mass captured (kg)
+  efficiency: number;  // removal efficiency at this loading (0~1)
+}
+
+export interface SimpleGaseousFilterConfig {
+  id: number;
+  name: string;
+  type: 'SimpleGaseousFilter';
+  flowCoefficient: number;    // C (power-law)
+  flowExponent: number;       // n (power-law)
+  loadingTable: LoadingPoint[];
+  breakthroughThreshold: number;  // default 0.05
+}
+
+export interface UVGIFilterConfig {
+  id: number;
+  name: string;
+  type: 'UVGIFilter';
+  flowCoefficient: number;
+  flowExponent: number;
+  susceptibility: number;      // k (m²/J)
+  irradiance: number;          // UV irradiance (W/m²)
+  chamberVolume: number;       // m³
+  tempCoeffs: number[];        // polynomial [a0, a1, a2, a3]
+  flowCoeffs: number[];        // polynomial [b0, b1, b2]
+  agingRate: number;           // degradation per hour
+  lampAgeHours: number;        // current lamp age
+}
+
+export interface SuperFilterConfig {
+  id: number;
+  name: string;
+  type: 'SuperFilter';
+  stages: Array<{
+    filterType: 'SimpleGaseousFilter' | 'UVGIFilter' | 'Filter';
+    filterId: number;  // reference to another filter config
+  }>;
+  loadingDecayRate: number;  // exponential decay between stages
+}
+
+export type FilterConfig = SimpleGaseousFilterConfig | UVGIFilterConfig | SuperFilterConfig;
+
 // ── UI State ─────────────────────────────────────────────────────────
 export type ToolMode = 'select' | 'addRoom' | 'addAmbient' | 'addLink';
 
@@ -317,6 +361,7 @@ export interface AppState {
   // Weather & AHS
   weatherConfig: WeatherConfig;
   ahsSystems: AHSConfig[];
+  filterConfigs: FilterConfig[];
 
   // Simulation
   result: SimulationResult | null;
@@ -363,6 +408,9 @@ export interface AppState {
   addAHS: (ahs: AHSConfig) => void;
   updateAHS: (id: number, updates: Partial<AHSConfig>) => void;
   removeAHS: (id: number) => void;
+  addFilterConfig: (fc: FilterConfig) => void;
+  updateFilterConfig: (id: number, updates: Partial<FilterConfig>) => void;
+  removeFilterConfig: (id: number) => void;
   exportTopology: () => TopologyJson;
   loadFromJson: (json: TopologyJson) => void;
   clearAll: () => void;

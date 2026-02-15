@@ -204,9 +204,76 @@ export default function Canvas2D() {
     if (state.appMode === 'results') {
       const appState = useAppStore.getState();
       const result = appState.result;
+      const transientResult = appState.transientResult;
+      const currentTransientStep = state.currentTransientStep;
 
-      if (result) {
-        // Map link results to edge flow data via placements
+      // Transient results overlay (prefer transient if available)
+      if (transientResult && transientResult.timeSeries.length > 0) {
+        const stepIdx = Math.min(currentTransientStep, transientResult.timeSeries.length - 1);
+        const step = transientResult.timeSeries[stepIdx];
+        if (step) {
+          // Build edge flows from transient massFlows
+          const edgeFlows: EdgeFlowResult[] = [];
+          for (const placement of story.placements) {
+            const edge = geo.edges.find(e => e.id === placement.edgeId);
+            if (!edge) continue;
+            const faceIds = edge.faceIds;
+            let fromZoneId = 0, toZoneId = 0;
+            if (faceIds.length === 2) {
+              const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
+              const z2 = story.zoneAssignments.find(z => z.faceId === faceIds[1]);
+              fromZoneId = z1?.zoneId ?? 0;
+              toZoneId = z2?.zoneId ?? 0;
+            } else if (faceIds.length === 1) {
+              const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
+              fromZoneId = z1?.zoneId ?? 0;
+            }
+            // Find link index matching this zone pair
+            const linkIdx = appState.links.findIndex(l =>
+              (l.from === fromZoneId && l.to === toZoneId) ||
+              (l.from === toZoneId && l.to === fromZoneId)
+            );
+            if (linkIdx >= 0 && step.airflow.massFlows[linkIdx] !== undefined) {
+              const link = appState.links[linkIdx];
+              const sign = link.from === fromZoneId ? 1 : -1;
+              edgeFlows.push({
+                edgeId: placement.edgeId,
+                massFlow: step.airflow.massFlows[linkIdx] * sign,
+                deltaP: 0,
+              });
+            }
+          }
+
+          // Build zone concentrations from transient data
+          const zoneConcs: ZoneConcentrationResult[] = [];
+          const zoneIdToFaceId = new Map<number, string>();
+          for (const z of story.zoneAssignments) {
+            zoneIdToFaceId.set(z.zoneId, z.faceId);
+          }
+          for (let nodeIdx = 0; nodeIdx < transientResult.nodes.length; nodeIdx++) {
+            const node = transientResult.nodes[nodeIdx];
+            const faceId = zoneIdToFaceId.get(node.id);
+            if (faceId && step.concentrations[nodeIdx]) {
+              // Sum all species concentrations for heatmap
+              const totalConc = step.concentrations[nodeIdx].reduce((a, b) => a + b, 0);
+              zoneConcs.push({
+                faceId,
+                concentration: totalConc,
+                pressure: step.airflow.pressures[nodeIdx] ?? 0,
+              });
+            }
+          }
+
+          if (edgeFlows.length > 0) {
+            drawFlowArrows(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
+            drawPressureLabels(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
+          }
+          if (zoneConcs.length > 0) {
+            drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH);
+          }
+        }
+      } else if (result) {
+        // Steady-state results overlay (fallback)
         const edgeFlows: EdgeFlowResult[] = [];
         const zoneConcs: ZoneConcentrationResult[] = [];
 

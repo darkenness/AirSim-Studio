@@ -11,6 +11,7 @@ import ControlPanel from '../ControlPanel/ControlPanel';
 import OccupantPanel from '../OccupantPanel/OccupantPanel';
 import WeatherPanel from '../WeatherPanel/WeatherPanel';
 import AHSPanel from '../AHSPanel/AHSPanel';
+import FilterPanel from '../FilterPanel/FilterPanel';
 import { ZoneProperties, EdgeProperties, PlacementProperties, StoryProperties } from './ZoneProperties';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
@@ -416,6 +417,7 @@ export default function PropertyPanel() {
               <TabsTrigger value="occupant" className="text-[11px] px-2.5 py-1">人员</TabsTrigger>
               <TabsTrigger value="weather" className="text-[11px] px-2.5 py-1">气象</TabsTrigger>
               <TabsTrigger value="ahs" className="text-[11px] px-2.5 py-1">空调</TabsTrigger>
+              <TabsTrigger value="filter" className="text-[11px] px-2.5 py-1">过滤器</TabsTrigger>
             </TabsList>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -446,6 +448,9 @@ export default function PropertyPanel() {
             </TabsContent>
             <TabsContent value="ahs" className="mt-0">
               <AHSPanel />
+            </TabsContent>
+            <TabsContent value="filter" className="mt-0">
+              <FilterPanel />
             </TabsContent>
           </div>
         </Tabs>
