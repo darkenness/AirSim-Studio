@@ -10,6 +10,7 @@
 #include "Occupant.h"
 #include "SimpleAHS.h"
 #include "io/WeatherReader.h"
+#include "io/WpcReader.h"
 #include <vector>
 #include <map>
 #include <functional>
@@ -69,6 +70,18 @@ public:
     // Simple AHS (HVAC systems)
     void setAHSystems(const std::vector<SimpleAHS>& systems) { ahSystems_ = systems; }
 
+    // External data file schedules (CVF/DVF) — merged into schedules_ at run start
+    void setExternalSchedules(const std::map<int, Schedule>& extSchedules) {
+        externalSchedules_ = extSchedules;
+    }
+
+    // WPC: per-opening wind pressure coefficients from CFD
+    void setWpcPressures(const std::vector<WpcRecord>& wpc) { wpcPressures_ = wpc; }
+    // WPC: per-opening link index mapping (wpcLinkIndices_[i] = link index for opening i)
+    void setWpcLinkIndices(const std::vector<int>& indices) { wpcLinkIndices_ = indices; }
+    // WPC: per-opening ambient concentrations from CFD
+    void setWpcConcentrations(const std::vector<WpcConcentration>& wpc) { wpcConcentrations_ = wpc; }
+
     // Optional progress callback: (currentTime, endTime) -> bool (return false to cancel)
     using ProgressCallback = std::function<bool(double, double)>;
     void setProgressCallback(ProgressCallback cb) { progressCb_ = cb; }
@@ -88,6 +101,10 @@ private:
     std::map<int, int> zoneTempSchedules_;  // nodeIdx -> scheduleId
     std::vector<WeatherRecord> weatherData_;
     std::vector<SimpleAHS> ahSystems_;
+    std::map<int, Schedule> externalSchedules_;
+    std::vector<WpcRecord> wpcPressures_;
+    std::vector<int> wpcLinkIndices_;
+    std::vector<WpcConcentration> wpcConcentrations_;
     ProgressCallback progressCb_;
 
     // Control system helpers
@@ -104,6 +121,9 @@ private:
 
     // Weather-driven boundary condition update
     void updateWeatherConditions(Network& network, double t);
+
+    // WPC: apply per-opening wind pressures and concentrations
+    void updateWpcConditions(Network& network, double t);
 
     // AHS flow injection
     void applyAHSFlows(Network& network, ContaminantSolver& contSolver, double t);

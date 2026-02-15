@@ -98,6 +98,9 @@ set(ENGINE_SOURCES
     src/core/DuctNetwork.cpp
     src/io/AchReport.cpp
     src/io/CsmReport.cpp
+    src/io/CbwReport.cpp
+    src/io/CvfReader.cpp
+    src/io/WpcReader.cpp
 )
 
 if(CONTAM_ENABLE_HDF5)
@@ -152,6 +155,7 @@ add_executable(contam_tests
     test/test_advanced.cpp
     test/test_validation.cpp
     test/test_p1_features.cpp
+    test/test_phase6.cpp
 )
 
 target_link_libraries(contam_tests PRIVATE

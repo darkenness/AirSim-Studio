@@ -320,11 +320,11 @@ TEST(ValidationCase02, Converges) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    EXPECT_GT(result.timeSteps.size(), 0);
+    EXPECT_GT(result.history.size(), 0);
 
     // Check first step converged
-    EXPECT_TRUE(result.timeSteps[0].converged);
-    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+    EXPECT_TRUE(result.history[0].airflow.converged);
+    EXPECT_LT(result.history[0].airflow.maxResidual, CONVERGENCE_TOL);
 }
 
 TEST(ValidationCase02, AirflowAccuracy) {
@@ -338,30 +338,30 @@ TEST(ValidationCase02, AirflowAccuracy) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    ASSERT_GT(result.timeSteps.size(), 0);
+    ASSERT_GT(result.history.size(), 0);
 
     // Reference airflow at first step (constant throughout)
     std::vector<double> refMassFlows = {0.002271335797949386, 0.0022713302524782785};
     std::vector<double> refPressures = {0.0, -1.2971159249570685};
 
-    auto& firstStep = result.timeSteps[0];
-    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+    auto& firstStep = result.history[0];
+    ASSERT_EQ(firstStep.airflow.massFlows.size(), refMassFlows.size());
 
     // Check mass flows (1e-4 relative tolerance)
     for (size_t i = 0; i < refMassFlows.size(); ++i) {
         double relTol = std::abs(refMassFlows[i]) * 1e-4;
-        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+        EXPECT_NEAR(firstStep.airflow.massFlows[i], refMassFlows[i], relTol)
             << "Mass flow mismatch at link " << i;
     }
 
     // Check pressures
-    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    ASSERT_EQ(firstStep.airflow.pressures.size(), refPressures.size());
     for (size_t i = 0; i < refPressures.size(); ++i) {
         if (std::abs(refPressures[i]) < 1e-6) {
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], 1e-6);
         } else {
             double relTol = std::abs(refPressures[i]) * 1e-4;
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], relTol)
                 << "Pressure mismatch at node " << i;
         }
     }
@@ -380,27 +380,27 @@ TEST(ValidationCase02, ConcentrationAccuracy) {
     ASSERT_TRUE(result.completed);
 
     // Find t=1800s step (peak source)
-    auto it1800 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+    auto it1800 = std::find_if(result.history.begin(), result.history.end(),
         [](const auto& step) { return std::abs(step.time - 1800.0) < 1e-3; });
-    ASSERT_NE(it1800, result.timeSteps.end());
+    ASSERT_NE(it1800, result.history.end());
 
     // Reference CO2 at t=1800s: Office conc = 0.00015774366850436868
     double refConc1800 = 0.00015774366850436868;
-    ASSERT_GT(it1800->concentrations.size(), 0);
-    ASSERT_GT(it1800->concentrations[0].size(), 1);  // Node 1 (Office), species 0 (CO2)
-    double actualConc1800 = it1800->concentrations[0][1];
+    ASSERT_GT(it1800->contaminant.concentrations.size(), 0);
+    ASSERT_GT(it1800->contaminant.concentrations[0].size(), 1);  // Node 1 (Office), species 0 (CO2)
+    double actualConc1800 = it1800->contaminant.concentrations[0][1];
     double relTol1800 = refConc1800 * 0.01;  // 1% tolerance
     EXPECT_NEAR(actualConc1800, refConc1800, relTol1800)
         << "CO2 concentration mismatch at t=1800s";
 
     // Find t=3600s step (end, source off since 1860s)
-    auto it3600 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+    auto it3600 = std::find_if(result.history.begin(), result.history.end(),
         [](const auto& step) { return std::abs(step.time - 3600.0) < 1e-3; });
-    ASSERT_NE(it3600, result.timeSteps.end());
+    ASSERT_NE(it3600, result.history.end());
 
     // Reference CO2 at t=3600s: Office conc = 0.00018714391510893705
     double refConc3600 = 0.00018714391510893705;
-    double actualConc3600 = it3600->concentrations[0][1];
+    double actualConc3600 = it3600->contaminant.concentrations[0][1];
     double relTol3600 = refConc3600 * 0.01;
     EXPECT_NEAR(actualConc3600, refConc3600, relTol3600)
         << "CO2 concentration mismatch at t=3600s";
@@ -421,13 +421,13 @@ TEST(ValidationCase02, MassConservation) {
     int numNodes = model.network.getNodeCount();
 
     // Check mass conservation at each time step
-    for (const auto& step : result.timeSteps) {
+    for (const auto& step : result.history) {
         std::vector<double> netFlow(numNodes, 0.0);
 
-        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+        for (size_t i = 0; i < step.airflow.massFlows.size(); ++i) {
             int from = model.network.getLink(i).getNodeFrom();
             int to = model.network.getLink(i).getNodeTo();
-            double flow = step.massFlows[i];
+            double flow = step.airflow.massFlows[i];
             netFlow[from] -= flow;
             netFlow[to] += flow;
         }
@@ -463,11 +463,11 @@ TEST(ValidationCase03, Converges) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    EXPECT_GT(result.timeSteps.size(), 0);
+    EXPECT_GT(result.history.size(), 0);
 
     // Check first step converged
-    EXPECT_TRUE(result.timeSteps[0].converged);
-    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+    EXPECT_TRUE(result.history[0].airflow.converged);
+    EXPECT_LT(result.history[0].airflow.maxResidual, CONVERGENCE_TOL);
 }
 
 TEST(ValidationCase03, AirflowAccuracy) {
@@ -481,7 +481,7 @@ TEST(ValidationCase03, AirflowAccuracy) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    ASSERT_GT(result.timeSteps.size(), 0);
+    ASSERT_GT(result.history.size(), 0);
 
     // Reference airflow (steady-state)
     std::vector<double> refMassFlows = {
@@ -496,24 +496,24 @@ TEST(ValidationCase03, AirflowAccuracy) {
         11.358868725428604     // Corridor
     };
 
-    auto& firstStep = result.timeSteps[0];
-    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+    auto& firstStep = result.history[0];
+    ASSERT_EQ(firstStep.airflow.massFlows.size(), refMassFlows.size());
 
     // Check mass flows
     for (size_t i = 0; i < refMassFlows.size(); ++i) {
         double relTol = std::abs(refMassFlows[i]) * 1e-4;
-        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+        EXPECT_NEAR(firstStep.airflow.massFlows[i], refMassFlows[i], relTol)
             << "Mass flow mismatch at link " << i;
     }
 
     // Check pressures
-    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    ASSERT_EQ(firstStep.airflow.pressures.size(), refPressures.size());
     for (size_t i = 0; i < refPressures.size(); ++i) {
         if (std::abs(refPressures[i]) < 1e-6) {
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], 1e-6);
         } else {
             double relTol = std::abs(refPressures[i]) * 1e-4;
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], relTol)
                 << "Pressure mismatch at node " << i;
         }
     }
@@ -532,19 +532,19 @@ TEST(ValidationCase03, ConcentrationAccuracy) {
     ASSERT_TRUE(result.completed);
 
     // Find t=3600s step (final)
-    auto it3600 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+    auto it3600 = std::find_if(result.history.begin(), result.history.end(),
         [](const auto& step) { return std::abs(step.time - 3600.0) < 1e-3; });
-    ASSERT_NE(it3600, result.timeSteps.end());
+    ASSERT_NE(it3600, result.history.end());
 
     // Reference CO2 at t=3600s
     double refOfficeConc = 0.0008078077413932571;
     double refCorridorConc = 0.0007501299758226876;
 
-    ASSERT_GT(it3600->concentrations.size(), 0);
-    ASSERT_GE(it3600->concentrations[0].size(), 3);  // Nodes 0,1,2
+    ASSERT_GT(it3600->contaminant.concentrations.size(), 0);
+    ASSERT_GE(it3600->contaminant.concentrations[0].size(), 3);  // Nodes 0,1,2
 
-    double actualOfficeConc = it3600->concentrations[0][1];    // Node 1 (Office)
-    double actualCorridorConc = it3600->concentrations[0][2];  // Node 2 (Corridor)
+    double actualOfficeConc = it3600->contaminant.concentrations[0][1];    // Node 1 (Office)
+    double actualCorridorConc = it3600->contaminant.concentrations[0][2];  // Node 2 (Corridor)
 
     double relTolOffice = refOfficeConc * 0.01;
     double relTolCorridor = refCorridorConc * 0.01;
@@ -569,13 +569,13 @@ TEST(ValidationCase03, MassConservation) {
 
     int numNodes = model.network.getNodeCount();
 
-    for (const auto& step : result.timeSteps) {
+    for (const auto& step : result.history) {
         std::vector<double> netFlow(numNodes, 0.0);
 
-        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+        for (size_t i = 0; i < step.airflow.massFlows.size(); ++i) {
             int from = model.network.getLink(i).getNodeFrom();
             int to = model.network.getLink(i).getNodeTo();
-            double flow = step.massFlows[i];
+            double flow = step.airflow.massFlows[i];
             netFlow[from] -= flow;
             netFlow[to] += flow;
         }
@@ -612,11 +612,11 @@ TEST(ValidationCase04, Converges) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    EXPECT_GT(result.timeSteps.size(), 0);
+    EXPECT_GT(result.history.size(), 0);
 
     // Check first step converged
-    EXPECT_TRUE(result.timeSteps[0].converged);
-    EXPECT_LT(result.timeSteps[0].maxResidual, CONVERGENCE_TOL);
+    EXPECT_TRUE(result.history[0].airflow.converged);
+    EXPECT_LT(result.history[0].airflow.maxResidual, CONVERGENCE_TOL);
 }
 
 TEST(ValidationCase04, AirflowAccuracy) {
@@ -630,7 +630,7 @@ TEST(ValidationCase04, AirflowAccuracy) {
 
     auto result = sim.run(model.network);
     ASSERT_TRUE(result.completed);
-    ASSERT_GT(result.timeSteps.size(), 0);
+    ASSERT_GT(result.history.size(), 0);
 
     // Reference airflow (steady-state)
     std::vector<double> refMassFlows = {
@@ -650,25 +650,25 @@ TEST(ValidationCase04, AirflowAccuracy) {
         0.5730967623578821     // Corridor
     };
 
-    auto& firstStep = result.timeSteps[0];
-    ASSERT_EQ(firstStep.massFlows.size(), refMassFlows.size());
+    auto& firstStep = result.history[0];
+    ASSERT_EQ(firstStep.airflow.massFlows.size(), refMassFlows.size());
 
     // Check mass flows
     for (size_t i = 0; i < refMassFlows.size(); ++i) {
         double relTol = std::abs(refMassFlows[i]) * 1e-4;
         if (relTol < 1e-9) relTol = 1e-9;  // Minimum absolute tolerance
-        EXPECT_NEAR(firstStep.massFlows[i], refMassFlows[i], relTol)
+        EXPECT_NEAR(firstStep.airflow.massFlows[i], refMassFlows[i], relTol)
             << "Mass flow mismatch at link " << i;
     }
 
     // Check pressures
-    ASSERT_EQ(firstStep.pressures.size(), refPressures.size());
+    ASSERT_EQ(firstStep.airflow.pressures.size(), refPressures.size());
     for (size_t i = 0; i < refPressures.size(); ++i) {
         if (std::abs(refPressures[i]) < 1e-6) {
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], 1e-6);
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], 1e-6);
         } else {
             double relTol = std::abs(refPressures[i]) * 1e-4;
-            EXPECT_NEAR(firstStep.pressures[i], refPressures[i], relTol)
+            EXPECT_NEAR(firstStep.airflow.pressures[i], refPressures[i], relTol)
                 << "Pressure mismatch at node " << i;
         }
     }
@@ -687,21 +687,21 @@ TEST(ValidationCase04, ConcentrationAccuracy) {
     ASSERT_TRUE(result.completed);
 
     // Find t=7200s step (final)
-    auto it7200 = std::find_if(result.timeSteps.begin(), result.timeSteps.end(),
+    auto it7200 = std::find_if(result.history.begin(), result.history.end(),
         [](const auto& step) { return std::abs(step.time - 7200.0) < 1e-3; });
-    ASSERT_NE(it7200, result.timeSteps.end());
+    ASSERT_NE(it7200, result.history.end());
 
     // Reference CO2 at t=7200s
     double refOfficeAConc = 0.0007493835916719974;
     double refOfficeBConc = 0.0010526575083065054;
     double refCorridorConc = 0.000757347777498626;
 
-    ASSERT_GT(it7200->concentrations.size(), 0);  // At least 1 species (CO2)
-    ASSERT_GE(it7200->concentrations[0].size(), 4);  // Nodes 0,1,2,3
+    ASSERT_GT(it7200->contaminant.concentrations.size(), 0);  // At least 1 species (CO2)
+    ASSERT_GE(it7200->contaminant.concentrations[0].size(), 4);  // Nodes 0,1,2,3
 
-    double actualOfficeAConc = it7200->concentrations[0][1];   // Node 1 (Office A)
-    double actualOfficeBConc = it7200->concentrations[0][2];   // Node 2 (Office B)
-    double actualCorridorConc = it7200->concentrations[0][3];  // Node 3 (Corridor)
+    double actualOfficeAConc = it7200->contaminant.concentrations[0][1];   // Node 1 (Office A)
+    double actualOfficeBConc = it7200->contaminant.concentrations[0][2];   // Node 2 (Office B)
+    double actualCorridorConc = it7200->contaminant.concentrations[0][3];  // Node 3 (Corridor)
 
     double relTolA = refOfficeAConc * 0.01;
     double relTolB = refOfficeBConc * 0.01;
@@ -729,13 +729,13 @@ TEST(ValidationCase04, MassConservation) {
 
     int numNodes = model.network.getNodeCount();
 
-    for (const auto& step : result.timeSteps) {
+    for (const auto& step : result.history) {
         std::vector<double> netFlow(numNodes, 0.0);
 
-        for (size_t i = 0; i < step.massFlows.size(); ++i) {
+        for (size_t i = 0; i < step.airflow.massFlows.size(); ++i) {
             int from = model.network.getLink(i).getNodeFrom();
             int to = model.network.getLink(i).getNodeTo();
-            double flow = step.massFlows[i];
+            double flow = step.airflow.massFlows[i];
             netFlow[from] -= flow;
             netFlow[to] += flow;
         }

@@ -9,6 +9,11 @@ TransientResult TransientSimulation::run(Network& network) {
     TransientResult result;
     result.completed = false;
 
+    // Merge external schedules (CVF/DVF) into main schedule map
+    for (const auto& [id, sched] : externalSchedules_) {
+        schedules_[id] = sched;
+    }
+
     // Initialize airflow solver
     Solver airflowSolver(config_.airflowMethod);
 
@@ -52,6 +57,11 @@ TransientResult TransientSimulation::run(Network& network) {
         // Step 0b: Update weather-driven boundary conditions
         if (!weatherData_.empty()) {
             updateWeatherConditions(network, t + currentDt);
+        }
+
+        // Step 0c: Update WPC per-opening wind pressures
+        if (!wpcPressures_.empty()) {
+            updateWpcConditions(network, t + currentDt);
         }
 
         // Step 1: Update control system (read sensors -> run controllers -> apply actuators)
@@ -452,6 +462,30 @@ void TransientSimulation::updateZoneTemperatures(Network& network, double t) {
         // Schedule value is in Kelvin (must be > 0)
         if (newTemp > 0.0) {
             network.getNode(nodeIdx).setTemperature(newTemp);
+        }
+    }
+}
+
+void TransientSimulation::updateWpcConditions(Network& network, double t) {
+    // Apply per-opening wind pressure from WPC data
+    auto pressures = WpcReader::interpolatePressure(wpcPressures_, t);
+
+    for (size_t i = 0; i < wpcLinkIndices_.size() && i < pressures.size(); ++i) {
+        int linkIdx = wpcLinkIndices_[i];
+        if (linkIdx < 0 || linkIdx >= network.getLinkCount()) continue;
+
+        auto& link = network.getLink(linkIdx);
+        // The WPC pressure is applied as an external pressure offset on the
+        // ambient node side of this opening. Find the ambient node and set
+        // its pressure to the WPC value.
+        int fromIdx = link.getNodeFrom();
+        int toIdx = link.getNodeTo();
+        if (fromIdx >= 0 && fromIdx < network.getNodeCount() &&
+            network.getNode(fromIdx).isKnownPressure()) {
+            network.getNode(fromIdx).setPressure(pressures[i]);
+        } else if (toIdx >= 0 && toIdx < network.getNodeCount() &&
+                   network.getNode(toIdx).isKnownPressure()) {
+            network.getNode(toIdx).setPressure(pressures[i]);
         }
     }
 }

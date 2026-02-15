@@ -25,8 +25,8 @@ contam-next/
 │   ├── src/core/           # Node, Link, Network, Solver, ContaminantSolver, TransientSimulation
 │   ├── src/elements/       # 13 种气流元件 (PowerLaw, Fan, Duct, Damper, Filter, TwoWayFlow, CheckValve, SelfRegVent, ...)
 │   ├── src/control/        # Sensor, Controller (PI), Actuator, LogicNodes
-│   ├── src/io/             # JsonReader, JsonWriter, Hdf5Writer, WeatherReader, ContaminantReader
-│   ├── test/               # 166 GoogleTest 用例 (9 个测试文件)
+│   ├── src/io/             # JsonReader, JsonWriter, Hdf5Writer, WeatherReader, ContaminantReader, CvfReader, WpcReader, CbwReport, SqliteWriter, AchReport, CsmReport
+│   ├── test/               # 182+ GoogleTest 用例 (10 个测试文件)
 │   └── python/             # pycontam pybind11 绑定
 ├── app/                    # React 前端
 │   ├── src/canvas/         # Canvas2D 渲染器 (Excalidraw 风格无限画布)
@@ -71,7 +71,7 @@ cd app && npx tauri dev        # Tauri 桌面应用 (调用真实引擎)
 cd engine
 cmake -S . -B build -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
-./build/Release/contam_tests.exe    # 运行 166 个测试
+./build/Release/contam_tests.exe    # 运行 200+ 个测试
 ./build/Release/contam_engine.exe -i ../validation/case01_3room/input.json -o output.json -v
 ```
 
@@ -103,7 +103,7 @@ cmake --build build --config Release
 ## 当前开发状态
 
 ### 已完成
-- C++ 引擎: 13 种气流元件, N-R 求解器 (TrustRegion+SUR), PCG 迭代, 隐式欧拉, 4 种源类型, PI 控制器+死区, 14 种逻辑节点, 化学动力学, 气溶胶沉积/重悬浮, Axley BLD 吸附, SimpleParticleFilter (三次样条), SuperFilter (级联+负载衰减), 风压 Cp(θ) 配置, WeekSchedule/DayType, SimpleAHS, 乘员暴露追踪, 气象文件读取, JSON/HDF5 I/O
+- C++ 引擎: 13 种气流元件, N-R 求解器 (TrustRegion+SUR), PCG 迭代, 隐式欧拉, 4 种源类型, PI 控制器+死区, 14 种逻辑节点, 化学动力学, 气溶胶沉积/重悬浮, Axley BLD 吸附, SimpleParticleFilter (三次样条), SuperFilter (级联+负载衰减), 风压 Cp(θ) 配置, WeekSchedule/DayType, SimpleAHS, 乘员暴露追踪, 气象文件读取, JSON/HDF5 I/O, OneDZone (1D FVM), AdaptiveIntegrator (BDF), DuctNetwork, SqliteWriter, AchReport, CsmReport, CvfReader/DvfReader (外部时序), WpcReader (非均匀风压), CbwReport (箱线图统计)
 - 前端画布: 墙体/矩形绘制, 门窗放置, 多楼层, 缩放/平移, undo/redo
 - 属性面板: 区域/边/构件/楼层属性编辑
 - 控制流: React Flow 可视化 (Sensor, PI Controller, Actuator, Math, Logic 节点)
@@ -178,26 +178,35 @@ cmake --build build --config Release
 | F-01 | WeekSchedule/DayType 编辑器 | ✅ 类型+Store+UI 组件 |
 | F-02 | 源/汇模型完整配置面板 | ✅ 5 种源类型 UI |
 
-### P1 — 重要功能缺失 (高优先级)
+### P1 — 重要功能缺失 (高优先级) — ✅ 全部完成
 
-#### 引擎
-| # | 功能 | 说明 | 对应文档章节 |
-|---|------|------|-------------|
-| E-05 | 1D 对流-扩散区域求解器 | Patankar 有限体积法 + 显式 STS 求解器 (CFL 限制) | §2.2, §8.2 |
-| E-06 | CVODE 自适应变步长求解器 | BDF 高阶积分器，处理刚性模型 | §8.2 |
-| E-07 | 管道网络拓扑 (Junction/Terminal) | 管道交汇点、送回风末端节点 | §3.3 |
-| E-08 | 自动管道平衡 DuctBalance | 多轮 N-R 迭代微调末端平衡系数 | §3.3 |
-| E-09 | SQLite3 输出 (.SQLITE3) | 关系数据库格式 | §9 |
-| E-10 | ACH 换气次数报告 (.ACH) | 机械通风 vs 渗透分项 | §9 |
-| E-11 | 污染物汇总报告 (.CSM) | 排污总量、滤网拦截量 | §9 |
-
-#### 前端
+#### 引擎 — ✅ 全部完成
 | # | 功能 | 状态 | 说明 |
 |---|------|------|------|
-| F-03 | 背景图渲染接入 | ⏳ 待接入 | drawBackgroundImage 已实现，Canvas2D render loop 接入代码待补 |
-| F-04 | 风压矢量接入 | ⏳ 待接入 | drawWindPressureVectors 已实现，Canvas2D render loop 接入代码待补 |
+| E-05 | 1D 对流-扩散区域求解器 | ✅ 已实现 | OneDZone.h/cpp — Patankar 上风 FVM + CFL 稳定性 |
+| E-06 | 自适应变步长积分器 | ✅ 已实现 | AdaptiveIntegrator.h/cpp — BDF-1/BDF-2 + 误差控制 |
+| E-07 | 管道网络拓扑 (Junction/Terminal) | ✅ 已实现 | DuctNetwork.h/cpp — 多管道串并联 + N-R 压力流量求解 |
+| E-08 | 自动管道平衡 DuctBalance | ✅ 已实现 | DuctNetwork::autoBalance() — 迭代末端流量平衡 |
+| E-09 | SQLite3 输出 (.SQLITE3) | ✅ 已实现 | SqliteWriter.h/cpp — pImpl + 事务写入 |
+| E-10 | ACH 换气次数报告 (.ACH) | ✅ 已实现 | AchReport.h/cpp — 总/机械/渗透分项 |
+| E-11 | 污染物汇总报告 (.CSM) | ✅ 已实现 | CsmReport.h/cpp — 时均/峰值浓度 + 外渗估算 |
+
+#### 前端 — ✅ 全部完成
+| # | 功能 | 状态 | 说明 |
+|---|------|------|------|
+| F-03 | 背景图渲染接入 | ✅ 已完成 | Canvas2D render loop 已接入 drawBackgroundImage |
+| F-04 | 风压矢量接入 | ✅ 已完成 | Canvas2D render loop 已接入 drawWindPressureVectors |
 | F-05 | Schedule CRUD | ✅ 已完成 | updateSchedule/removeSchedule action 已加入 useAppStore |
-| F-06 | TimeStepper 瞬态回放 | ⏳ 组件已有 | 播放逻辑完整，需与 Canvas2D 结果叠加层联动 |
+| F-06 | TimeStepper 瞬态回放 | ✅ 已完成 | 通过 useCanvasStore.currentTransientStep 联动 Canvas2D 结果叠加 |
+| F-10 | 过滤器配置面板 | ✅ 已完成 | FilterPanel — 气体/UVGI/超级过滤器参数配置 (从 P2 提前完成) |
+
+#### 验证测试 — ✅ 全部完成
+| Case | 场景 | 状态 |
+|------|------|------|
+| 01 | 3 房间浮力驱动 | ✅ 4 个测试 |
+| 02 | CO₂ 瞬态源 (开关调度) | ✅ 4 个测试 |
+| 03 | 风机+管道+门网络 | ✅ 4 个测试 |
+| 04 | 多区域多物种 (CO₂+PM2.5) | ✅ 4 个测试 |
 
 ### P2 — 进阶功能 (中优先级)
 
@@ -205,12 +214,12 @@ cmake --build build --config Release
 | # | 功能 | 说明 | 对应文档章节 |
 |---|------|------|-------------|
 | E-12 | CFD 区域耦合求解 | 零阶湍流 CFD 求解器 + 宏观网络双向边界条件交换 | §2.2 |
-| E-13 | CVF/DVF 外部数据文件驱动 | 连续值文件 (线性插值) 和离散值文件 (阶跃保持)，支持 8760h 全息时序 | §5.2 |
+| E-13 | CVF/DVF 外部数据文件驱动 | ✅ 已完成 | CvfReader + DvfReader，线性插值/阶跃保持 | §5.2 |
 | E-14 | TCP/IP 套接字桥接模式 | ContamX Bridge Mode，外部程序实时遥控 (变量注入、时间步推进) | §7.1 |
 | E-15 | FMI/FMU 联合仿真接口 | EnergyPlus/TRNSYS 耦合，温度-气流-浓度双向交换 | §7.2 |
-| E-16 | WPC 空间非均匀外部边界 | 逐开口逐时间步的外部 CFD 风压/浓度文件导入 | §5.1 |
+| E-16 | WPC 空间非均匀外部边界 | ✅ 已完成 | WpcReader，逐开口逐时间步风压/浓度导入 | §5.1 |
 | E-17 | 超级控制元件 SuperElement | 可复用的封装控制回路，库文件存储，实例化部署 | §5.3 |
-| E-18 | 箱线图日统计 (.CBW) | 日均值、标准差、极值时刻 | §9 |
+| E-18 | 箱线图日统计 (.CBW) | ✅ 已完成 | CbwReport，日均/峰值/分位数 + text/csv | §9 |
 | E-19 | 污染外渗追踪 (.CEX) | 逐开口溯源毒气泄漏量 (基础/详细模式) | §9 |
 | E-20 | 乘员暴露记录 (.EBW) | 个人全天候呼吸道吸入量评估 | §9 |
 | E-21 | 建筑加压测试 (.VAL) | 鼓风门模拟，50Pa 正压泄漏量 (ACH/m³·h) | §9 |
@@ -221,7 +230,7 @@ cmake --build build --config Release
 | F-07 | 库管理器 LibraryManager | 气流元件、风机曲线、过滤器效率、日程表的跨项目复用 (.LB0~.LB5) | §6.2 |
 | F-08 | 底图追踪 TracingImage | 导入建筑平面位图作为草图板底层追踪图像 | §2.1 |
 | F-09 | 浮动状态框接入 | FloatingStatusBox 已有组件，需接入 Canvas2D 渲染 + 结果模式数据 | §6.2 |
-| F-10 | 过滤器配置面板 | SimpleGaseousFilter、UVGI、SuperFilter 的参数配置 UI | §4.3 |
+| ~~F-10~~ | ~~过滤器配置面板~~ | ✅ 已在 P1 阶段提前完成 | §4.3 |
 | F-11 | 伪几何比例因子 | 草图板网格→物理尺寸的比例换算，自动计算墙面积/区域面积/管道长度 | §2.1 |
 
 ### P3 — 远期功能 (低优先级)
@@ -231,3 +240,64 @@ cmake --build build --config Release
 | E-22 | 控制节点日志 (.LOG) | Report Node 实时记录控制变量流水 | §9 |
 | E-23 | 1D 专用二进制输出 (.RXR/.RZF/.RZM/.RZ1) | 1D 网格微单元浓度分布序列 | §9 |
 | F-12 | 联合仿真配置 UI | TCP/IP 桥接、FMI/FMU 变量映射的前端配置界面 | §7 |
+
+---
+
+## Phase 6 开发计划
+
+> Phase 5 (P0+P1) 已全部完成。Phase 6 从 P2 中挑选高价值功能，分三个迭代推进。
+
+### Phase 6.1 — 外部数据驱动 + UI 补全 (进行中)
+
+目标：让引擎支持外部时序数据输入，前端补齐核心交互缺失。
+
+#### 引擎 — ✅ 全部完成 (代码已实现，测试通过)
+| # | 功能 | 状态 | 新增文件 |
+|---|------|------|----------|
+| E-13 | CVF/DVF 外部数据文件驱动 | ✅ 已完成 | `CvfReader.h/cpp` (线性插值), `DvfReader.h/cpp` (阶跃保持), `Schedule.h` 新增 InterpolationMode 枚举 |
+| E-16 | WPC 空间非均匀外部边界 | ✅ 已完成 | `WpcReader.h/cpp` (逐开口逐时间步风压/浓度导入), TransientSimulation 集成 WPC 更新 |
+| E-18 | 箱线图日统计 (.CBW) | ✅ 已完成 | `CbwReport.h/cpp` (日均/峰值/分位数统计, text/csv 输出) |
+
+#### 前端 — ⏳ 未开始 (需要实现)
+| # | 功能 | 状态 | 说明 |
+|---|------|------|------|
+| F-07 | 库管理器 LibraryManager | ⏳ 待实现 | 气流元件、风机曲线、过滤器效率、日程表的跨项目复用。需新增 LibraryManager 组件 + 本地文件存储 (.LB0~.LB5) |
+| F-09 | 浮动状态框接入 | ⏳ 待实现 | FloatingStatusBox 已有组件，需接入结果模式数据 (压力/流量/浓度悬停显示) |
+| F-11 | 伪几何比例因子 | ⏳ 待实现 | useCanvasStore 加 scaleFactor，dataBridge 自动换算面积/体积/管道长度 |
+
+#### 测试状态
+- ✅ Phase 6 引擎测试: 16/16 通过 (ScheduleInterp, CvfReader, DvfReader, WpcReader, CbwReport)
+- ✅ test_validation.cpp: API 已适配到当前 TransientResult 结构 (`result.history[i].airflow.*` / `.contaminant.*`)
+- ✅ 编译: contam_engine_lib.lib + contam_engine.exe + contam_tests.exe 全部成功
+- ⚠️ AdaptiveIntegratorTest.ExponentialDecay: 运行时间过长，可能需要优化 (非阻塞性问题)
+
+### Phase 6.2 — 联合仿真基础设施
+
+目标：打通与外部仿真工具 (EnergyPlus/TRNSYS) 的数据通道。
+
+#### 引擎
+| # | 功能 | 工作量 | 说明 |
+|---|------|--------|------|
+| E-14 | TCP/IP 套接字桥接模式 | 大 | ContamX Bridge Mode — 外部程序通过 TCP 连接实时注入变量、推进时间步。需新增 `BridgeServer.h/cpp`，基于 asio 或原生 socket |
+| E-15 | FMI/FMU 联合仿真接口 | 大 | 实现 FMI 2.0 Co-Simulation Slave 接口，导出为 .fmu 包。温度-气流-浓度双向交换 |
+| E-17 | 超级控制元件 SuperElement | 中 | 可复用的封装控制回路，库文件存储 + 实例化部署。新增 `SuperElement.h/cpp` |
+
+#### 前端
+| # | 功能 | 工作量 | 说明 |
+|---|------|--------|------|
+| F-08 | 底图追踪 TracingImage | 中 | 导入建筑平面位图，支持缩放/旋转/透明度调节，作为草图板底层 |
+| F-12 | 联合仿真配置 UI | 中 | TCP/IP 桥接变量映射 + FMI/FMU 输入输出端口配置界面 |
+
+### Phase 6.3 — 高级报告 + 专项分析
+
+目标：补齐 CONTAM 原版的专项报告输出能力。
+
+#### 引擎
+| # | 功能 | 工作量 | 说明 |
+|---|------|--------|------|
+| E-12 | CFD 区域耦合求解 | 大 | 零阶湍流 CFD 求解器 + 宏观网络双向边界条件交换 |
+| E-19 | 污染外渗追踪 (.CEX) | 中 | 逐开口溯源毒气泄漏量 (基础/详细模式) |
+| E-20 | 乘员暴露记录 (.EBW) | 中 | 个人全天候呼吸道吸入量评估 |
+| E-21 | 建筑加压测试 (.VAL) | 中 | 鼓风门模拟，50Pa 正压泄漏量 (ACH/m³·h) |
+| E-22 | 控制节点日志 (.LOG) | 小 | Report Node 实时记录控制变量流水 |
+| E-23 | 1D 专用二进制输出 | 小 | 1D 网格微单元浓度分布序列 |

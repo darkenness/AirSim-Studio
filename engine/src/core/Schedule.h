@@ -5,6 +5,8 @@
 
 namespace contam {
 
+enum class InterpolationMode { Linear, StepHold };
+
 // A single point in a piecewise-linear schedule
 struct SchedulePoint {
     double time;   // seconds from simulation start
@@ -14,8 +16,9 @@ struct SchedulePoint {
     SchedulePoint(double t, double v) : time(t), value(v) {}
 };
 
-// Piecewise-linear time schedule
-// Interpolates linearly between defined points
+// Time schedule with configurable interpolation
+// Linear: interpolates linearly between defined points
+// StepHold: holds value constant until next point (zero-order hold)
 // Before first point: uses first value
 // After last point: uses last value
 class Schedule {
@@ -26,6 +29,9 @@ public:
     Schedule() : id(-1) {}
     Schedule(int id, const std::string& name) : id(id), name(name) {}
 
+    void setInterpolationMode(InterpolationMode m) { interpMode_ = m; }
+    InterpolationMode getInterpolationMode() const { return interpMode_; }
+
     void addPoint(double time, double value) {
         points_.push_back({time, value});
         // Keep sorted by time
@@ -35,7 +41,7 @@ public:
                   });
     }
 
-    // Get interpolated value at time t
+    // Get value at time t (respects interpolation mode)
     double getValue(double t) const {
         if (points_.empty()) return 1.0;
         if (points_.size() == 1) return points_[0].value;
@@ -48,6 +54,9 @@ public:
         // Find bracketing interval
         for (size_t i = 0; i < points_.size() - 1; ++i) {
             if (t >= points_[i].time && t <= points_[i + 1].time) {
+                if (interpMode_ == InterpolationMode::StepHold) {
+                    return points_[i].value;
+                }
                 double dt = points_[i + 1].time - points_[i].time;
                 if (dt < 1e-15) return points_[i].value;
                 double alpha = (t - points_[i].time) / dt;
@@ -60,6 +69,7 @@ public:
     const std::vector<SchedulePoint>& getPoints() const { return points_; }
 
 private:
+    InterpolationMode interpMode_ = InterpolationMode::Linear;
     std::vector<SchedulePoint> points_;
 };
 
