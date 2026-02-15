@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, WeekSchedule, DayType } from '../types';
 
 export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Model data
@@ -21,6 +21,8 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   species: [],
   sources: [],
   schedules: [],
+  weekSchedules: [],
+  dayTypes: [],
   occupants: [],
   controlSystem: { sensors: [], controllers: [], actuators: [] },
   transientConfig: { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
@@ -112,6 +114,26 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
     sources: state.sources.map((s, i) => (i === idx ? { ...s, ...updates } : s)),
   })),
   addSchedule: (sch: Schedule) => set((state) => ({ schedules: [...state.schedules, sch] })),
+  updateSchedule: (id, updates) => set((state) => ({
+    schedules: state.schedules.map(s => s.id === id ? { ...s, ...updates } : s),
+  })),
+  removeSchedule: (id) => set((state) => ({
+    schedules: state.schedules.filter(s => s.id !== id),
+  })),
+  addWeekSchedule: (ws) => set((state) => ({ weekSchedules: [...state.weekSchedules, ws] })),
+  updateWeekSchedule: (id, updates) => set((state) => ({
+    weekSchedules: state.weekSchedules.map(ws => ws.id === id ? { ...ws, ...updates } : ws),
+  })),
+  removeWeekSchedule: (id) => set((state) => ({
+    weekSchedules: state.weekSchedules.filter(ws => ws.id !== id),
+  })),
+  addDayType: (dt) => set((state) => ({ dayTypes: [...state.dayTypes, dt] })),
+  updateDayType: (id, updates) => set((state) => ({
+    dayTypes: state.dayTypes.map(dt => dt.id === id ? { ...dt, ...updates } : dt),
+  })),
+  removeDayType: (id) => set((state) => ({
+    dayTypes: state.dayTypes.filter(dt => dt.id !== id),
+  })),
   addOccupant: (occ: Occupant) => set((state) => ({ occupants: [...state.occupants, occ] })),
   removeOccupant: (id: number) => set((state) => ({
     occupants: state.occupants.filter((o) => o.id !== id),

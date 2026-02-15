@@ -23,9 +23,11 @@ import {
   drawPlacements, drawWallPreview, drawRectPreview,
   drawCrosshair, readThemeColors,
   drawFlowArrows, drawPressureLabels, drawConcentrationHeatmap,
+  drawBackgroundImage, drawWindPressureVectors,
   type ThemeColors,
   type EdgeFlowResult,
   type ZoneConcentrationResult,
+  type WallCpData,
 } from './renderer';
 import {
   constrainOrthogonal, findNearestVertex,
@@ -45,6 +47,7 @@ export default function Canvas2D() {
   const rafRef = useRef<number>(0);
   const colorsRef = useRef<ThemeColors | null>(null);
   const cursorScreenRef = useRef({ x: 0, y: 0 });
+  const bgImageRef = useRef<HTMLImageElement | null>(null);
 
   // Pan state
   const isPanningRef = useRef(false);
@@ -76,6 +79,24 @@ export default function Canvas2D() {
 
   // Mark dirty when tool/mode changes
   useEffect(() => { dirtyRef.current = true; }, [toolMode, appMode, gridSize, showGrid]);
+
+  // ── Load background image ──
+  useEffect(() => {
+    const state = useCanvasStore.getState();
+    const story = state.stories.find(s => s.id === state.activeStoryId);
+    const url = story?.backgroundImage?.url;
+    if (!url) {
+      bgImageRef.current = null;
+      return;
+    }
+    if (bgImageRef.current?.src === url) return;
+    const img = new Image();
+    img.onload = () => {
+      bgImageRef.current = img;
+      dirtyRef.current = true;
+    };
+    img.src = url;
+  });
 
   // ── DPI-aware canvas sizing ──
   const resizeCanvas = useCallback(() => {
@@ -126,6 +147,17 @@ export default function Canvas2D() {
       return;
     }
     const geo = story.geometry;
+
+    // 0. Background image (behind everything)
+    if (story.backgroundImage?.url) {
+      const bgImg = bgImageRef.current;
+      if (bgImg && bgImg.src === story.backgroundImage.url && bgImg.complete) {
+        drawBackgroundImage(ctx, bgImg, story.backgroundImage.opacity,
+          story.backgroundImage.scalePixelsPerMeter,
+          story.backgroundImage.offsetX, story.backgroundImage.offsetY,
+          camera, cssW, cssH);
+      }
+    }
 
     // 1. Dot grid
     if (showGrid) {
@@ -236,6 +268,26 @@ export default function Canvas2D() {
         }
         if (zoneConcs.length > 0) {
           drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH);
+        }
+
+        // Wind pressure vectors on exterior walls
+        const windSpeed = appState.windSpeed;
+        const windDirection = appState.windDirection;
+        if (windSpeed > 0.01) {
+          const cpData: WallCpData[] = [];
+          for (const edge of geo.edges) {
+            if (!edge.isExterior) continue;
+            const v1 = geo.vertices.find(v => v.id === edge.vertexIds[0]);
+            const v2 = geo.vertices.find(v => v.id === edge.vertexIds[1]);
+            if (!v1 || !v2) continue;
+            const edx = v2.x - v1.x;
+            const edy = v2.y - v1.y;
+            const azimuth = (Math.atan2(edx, -edy) * 180 / Math.PI + 360) % 360;
+            const angleRad = (windDirection - azimuth) * Math.PI / 180;
+            const cp = 0.6 * Math.cos(angleRad);
+            cpData.push({ edgeId: edge.id, cp, azimuth });
+          }
+          drawWindPressureVectors(ctx, geo, cpData, windDirection, windSpeed, camera, cssW, cssH, colors);
         }
       }
     }

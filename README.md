@@ -127,6 +127,11 @@ contam-next/
 - ✅ 暗色模式: 全组件 theme-aware 颜色 (无硬编码)
 - ✅ CI/CD: GitHub Actions (三平台引擎测试 + 前端 tsc/vitest/build + Tauri 打包)
 - ✅ 引擎集成: JSON 解析气象/AHS/人员, SimpleGaseousFilter, UVGI 过滤器, HDF5 输出
-- 🔲 结果叠加层接入 (流向箭头, 浓度热力图, 压力标签, 风压矢量)
+- ✅ P0 引擎: 5 种源类型 (Constant/Decay/PressureDriven/Cutoff/Burst), 非微量密度耦合
+- ✅ P0 前端: WeekSchedule/DayType 编辑器, 5 种源类型完整配置 UI, Schedule CRUD
+- ✅ 结果叠加层: 流向箭头 + 浓度热力图 + 压力标签 (已接入 Canvas2D)
+- ⏳ 背景图渲染接入 (drawBackgroundImage 待接入 Canvas2D)
+- ⏳ 风压矢量接入 (drawWindPressureVectors 待接入 Canvas2D)
+- ⏳ TimeStepper 瞬态回放联动
 - 🔲 Tauri 原生文件对话框
 - 🔲 StateNode 层级状态机启用

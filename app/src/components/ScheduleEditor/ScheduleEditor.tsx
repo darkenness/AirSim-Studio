@@ -3,6 +3,7 @@ import ReactEChartsCore from 'echarts-for-react';
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, Clock, Copy } from 'lucide-react';
 import type { Schedule, SchedulePoint } from '../../types';
+import WeekScheduleEditor from './WeekScheduleEditor';
 
 const PRESETS: { name: string; points: SchedulePoint[] }[] = [
   {
@@ -165,17 +166,16 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
 }
 
 export default function ScheduleEditor() {
-  const { schedules, addSchedule } = useAppStore();
+  const { schedules, addSchedule, updateSchedule, removeSchedule, updateSource, sources } = useAppStore();
   const updateScheduleInStore = (updated: Schedule) => {
-    useAppStore.setState((state) => ({
-      schedules: state.schedules.map((s) => s.id === updated.id ? updated : s),
-    }));
+    updateSchedule(updated.id, updated);
   };
   const removeScheduleFromStore = (id: number) => {
-    useAppStore.setState((state) => ({
-      schedules: state.schedules.filter((s) => s.id !== id),
-      sources: state.sources.map((src) => src.scheduleId === id ? { ...src, scheduleId: -1 } : src),
-    }));
+    // Unlink sources that reference this schedule
+    sources.forEach((src, idx) => {
+      if (src.scheduleId === id) updateSource(idx, { scheduleId: -1 });
+    });
+    removeSchedule(id);
   };
 
   const handleAdd = () => {
@@ -187,28 +187,59 @@ export default function ScheduleEditor() {
     });
   };
 
+  const [activeTab, setActiveTab] = useState<'schedules' | 'week'>('schedules');
+
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <Clock size={14} className="text-teal-500" />
-        <span className="text-xs font-bold text-foreground">时间表</span>
-        <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-teal-500">
-          <Plus size={14} />
+      <div className="flex border-b border-border">
+        <button
+          onClick={() => setActiveTab('schedules')}
+          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+            activeTab === 'schedules'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          时间表
+        </button>
+        <button
+          onClick={() => setActiveTab('week')}
+          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+            activeTab === 'week'
+              ? 'text-primary border-b-2 border-primary'
+              : 'text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          周计划
         </button>
       </div>
 
-      {schedules.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic">尚未添加时间表。点击 + 添加。</p>
-      )}
+      {activeTab === 'schedules' ? (
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2">
+            <Clock size={14} className="text-teal-500" />
+            <span className="text-xs font-bold text-foreground">时间表</span>
+            <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-teal-500">
+              <Plus size={14} />
+            </button>
+          </div>
 
-      {schedules.map((sch) => (
-        <SingleScheduleEditor
-          key={sch.id}
-          schedule={sch}
-          onUpdate={updateScheduleInStore}
-          onDelete={() => removeScheduleFromStore(sch.id)}
-        />
-      ))}
+          {schedules.length === 0 && (
+            <p className="text-[10px] text-muted-foreground italic">尚未添加时间表。点击 + 添加。</p>
+          )}
+
+          {schedules.map((sch) => (
+            <SingleScheduleEditor
+              key={sch.id}
+              schedule={sch}
+              onUpdate={updateScheduleInStore}
+              onDelete={() => removeScheduleFromStore(sch.id)}
+            />
+          ))}
+        </div>
+      ) : (
+        <WeekScheduleEditor />
+      )}
     </div>
   );
 }

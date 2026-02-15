@@ -99,7 +99,7 @@ export interface Species {
   effectiveDensity: number;
 }
 
-export type SourceType = 'Constant' | 'ExponentialDecay' | 'PressureDriven' | 'CutoffConcentration';
+export type SourceType = 'Constant' | 'ExponentialDecay' | 'PressureDriven' | 'CutoffConcentration' | 'Burst';
 
 export interface Source {
   zoneId: number;
@@ -113,6 +113,9 @@ export interface Source {
   multiplier?: number;         // scaling factor (ExponentialDecay)
   pressureCoeff?: number;      // kg/(s·Pa) (PressureDriven)
   cutoffConc?: number;         // kg/m³ threshold (CutoffConcentration)
+  burstMass?: number;          // kg total release (Burst)
+  burstTime?: number;          // activation time seconds (Burst)
+  burstDuration?: number;      // release duration seconds (Burst)
 }
 
 export interface SchedulePoint {
@@ -124,6 +127,19 @@ export interface Schedule {
   id: number;
   name: string;
   points: SchedulePoint[];
+}
+
+// ── Week Schedule / Day Type ────────────────────────────────────────
+export interface DayType {
+  id: number;
+  name: string;           // e.g. "工作日", "周末", "假日"
+  scheduleId: number;     // references a Schedule
+}
+
+export interface WeekSchedule {
+  id: number;
+  name: string;
+  dayTypes: number[];     // 7 DayType IDs, index 0=Monday ... 6=Sunday
 }
 
 export interface TransientConfig {
@@ -292,6 +308,8 @@ export interface AppState {
   species: Species[];
   sources: Source[];
   schedules: Schedule[];
+  weekSchedules: WeekSchedule[];
+  dayTypes: DayType[];
   occupants: Occupant[];
   controlSystem: ControlSystem;
   transientConfig: TransientConfig;
@@ -327,6 +345,14 @@ export interface AppState {
   removeSource: (idx: number) => void;
   updateSource: (idx: number, updates: Partial<Source>) => void;
   addSchedule: (sch: Schedule) => void;
+  updateSchedule: (id: number, updates: Partial<Schedule>) => void;
+  removeSchedule: (id: number) => void;
+  addWeekSchedule: (ws: WeekSchedule) => void;
+  updateWeekSchedule: (id: number, updates: Partial<WeekSchedule>) => void;
+  removeWeekSchedule: (id: number) => void;
+  addDayType: (dt: DayType) => void;
+  updateDayType: (id: number, updates: Partial<DayType>) => void;
+  removeDayType: (id: number) => void;
   addOccupant: (occ: Occupant) => void;
   removeOccupant: (id: number) => void;
   updateOccupant: (id: number, updates: Partial<Occupant>) => void;

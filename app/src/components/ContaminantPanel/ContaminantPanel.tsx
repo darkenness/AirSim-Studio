@@ -190,6 +190,7 @@ function SourceSection() {
                 <option value="ExponentialDecay">指数衰减源</option>
                 <option value="PressureDriven">压力驱动源</option>
                 <option value="CutoffConcentration">浓度切断源</option>
+                <option value="Burst">爆发式释放源</option>
               </select>
             </label>
             <div className="grid grid-cols-2 gap-1.5">
@@ -213,6 +214,16 @@ function SourceSection() {
             {src.type === 'CutoffConcentration' && (
               <InputField label="切断浓度" value={src.cutoffConc ?? 0} unit="kg/m³" type="number" step="0.0001"
                 onChange={(v) => updateSource(idx, { cutoffConc: parseFloat(v) || 0 })} />
+            )}
+            {src.type === 'Burst' && (
+              <div className="grid grid-cols-3 gap-1.5">
+                <InputField label="释放总量" value={src.burstMass ?? 0.001} unit="kg" type="number" step="0.0001"
+                  onChange={(v) => updateSource(idx, { burstMass: parseFloat(v) || 0.001 })} />
+                <InputField label="触发时间" value={src.burstTime ?? 0} unit="s" type="number" step="60"
+                  onChange={(v) => updateSource(idx, { burstTime: parseFloat(v) || 0 })} />
+                <InputField label="持续时间" value={src.burstDuration ?? 60} unit="s" type="number" step="1"
+                  onChange={(v) => updateSource(idx, { burstDuration: parseFloat(v) || 60 })} />
+              </div>
             )}
           </div>
         );
