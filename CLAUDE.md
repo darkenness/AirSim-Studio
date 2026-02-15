@@ -26,7 +26,7 @@ contam-next/
 │   ├── src/elements/       # 13 种气流元件 (PowerLaw, Fan, Duct, Damper, Filter, TwoWayFlow, CheckValve, SelfRegVent, ...)
 │   ├── src/control/        # Sensor, Controller (PI), Actuator, LogicNodes
 │   ├── src/io/             # JsonReader, JsonWriter, Hdf5Writer, WeatherReader, ContaminantReader
-│   ├── test/               # 139 GoogleTest 用例 (9 个测试文件)
+│   ├── test/               # 166 GoogleTest 用例 (9 个测试文件)
 │   └── python/             # pycontam pybind11 绑定
 ├── app/                    # React 前端
 │   ├── src/canvas/         # Canvas2D 渲染器 (Excalidraw 风格无限画布)
@@ -71,7 +71,7 @@ cd app && npx tauri dev        # Tauri 桌面应用 (调用真实引擎)
 cd engine
 cmake -S . -B build -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
-./build/Release/contam_tests.exe    # 运行 139 个测试
+./build/Release/contam_tests.exe    # 运行 166 个测试
 ./build/Release/contam_engine.exe -i ../validation/case01_3room/input.json -o output.json -v
 ```
 
@@ -113,11 +113,21 @@ cmake --build build --config Release
 ### 待完成 — 集成缺口 (原有)
 1. **结果叠加层未接入** — renderer.ts 中 drawFlowArrows/drawConcentrationHeatmap/drawPressureLabels/drawWindPressureVectors 已实现但 Canvas2D 渲染循环未调用
 2. **背景图渲染未接入** — drawBackgroundImage 已实现但未调用
-3. **浮动状态框未接入** — FloatingStatusBox 组件存在但未在 Canvas2D 中渲染
-4. **TimeStepper 未接入** — 组件存在但未在 Canvas2D 中渲染
-5. **前端零测试** — 无 Vitest/Playwright 测试文件
-6. **文件对话框** — 保存/加载使用浏览器 API，应改用 Tauri 原生对话框
-7. **StateNode 未启用** — 层级状态机已编写但工具仍使用 switch(toolMode)
+3. **文件对话框** — 保存/加载使用浏览器 API，应改用 Tauri 原生对话框
+4. **StateNode 未启用** — 层级状态机已编写但工具仍使用 switch(toolMode)
+
+### 已完成 — Phase 4 + 4.5
+- ✅ 前端 25 个 Vitest 测试 (store CRUD, DAG 验证, 文件操作)
+- ✅ 引擎 JSON 解析 (气象记录, AHS 系统, 人员)
+- ✅ DAG 环路检测 (控制流画布)
+- ✅ HDF5 输出 (稳态+瞬态, 物种/节点元数据)
+- ✅ SimpleGaseousFilter + UVGI 过滤器元件
+- ✅ 暗色模式全组件适配 (7 个组件, 无硬编码颜色)
+- ✅ PropertyPanel 标签页布局优化 (flex-wrap)
+- ✅ Null-safety 修复 (FloatingStatusBox, ZoneProperties, EdgeProperties, PlacementProperties, StoryProperties)
+- ✅ ResultsView 底部面板响应式布局
+- ✅ CI 添加 Vitest 步骤
+- ✅ AHS 配置面板, 气象面板
 
 ---
 

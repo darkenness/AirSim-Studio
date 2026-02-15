@@ -21,7 +21,7 @@ Multi-zone indoor air quality and ventilation simulation software — a modern r
 └───────────────────────────────────────────┼───────────────┘
                                             │ CLI call
                                ┌────────────▼──────────────┐
-                               │  C++17 Engine (139 tests)  │
+                               │  C++17 Engine (166 tests)  │
                                │  • N-R Solver (Trust+SUR)  │
                                │  • 13 FlowElement types    │
                                │  • Control System (PI)     │
@@ -53,7 +53,7 @@ cd engine
 cmake -S . -B build -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
 # Run 139 tests
-./build/Release/contam_tests.exe
+./build/Release/contam_tests.exe   # 166 tests
 # Run CLI
 ./build/Release/contam_engine.exe -i ../validation/case01_3room/input.json -o output.json -v
 ```
@@ -76,23 +76,24 @@ contam-next/
 │   ├── src/elements/       # 13 flow elements (PowerLaw, Fan, Duct, TwoWayFlow, Damper, Filter, CheckValve, SelfRegVent, ...)
 │   ├── src/control/        # Sensor, Controller (PI), Actuator, LogicNodes (14 types)
 │   ├── src/io/             # JsonReader, JsonWriter, Hdf5Writer, WeatherReader, ContaminantReader
-│   ├── test/               # 139 GoogleTest cases (9 test files)
+│   ├── test/               # 166 GoogleTest cases (9 test files)
 │   └── python/             # pycontam pybind11 bindings
 ├── app/                    # Tauri 2.0 + React 19 frontend
 │   ├── src/canvas/         # Canvas2D (Excalidraw-style infinite 2D editor)
-│   ├── src/components/     # TopBar, PropertyPanel, ContaminantPanel, ControlPanel, ScheduleEditor, ResultsView, ...
+│   ├── src/components/     # TopBar, PropertyPanel, ContaminantPanel, ControlPanel, ScheduleEditor, ResultsView, AHSPanel, WeatherPanel, ...
 │   ├── src/control/        # React Flow control network visualization
 │   ├── src/store/          # Zustand + zundo (useCanvasStore, useAppStore)
 │   ├── src/model/          # geometry.ts (Vertex→Edge→Face), dataBridge.ts (canvas→engine JSON)
+│   ├── src/test/           # 25 Vitest tests (store CRUD, DAG validation, file ops)
 │   └── src-tauri/          # Rust backend (run_engine IPC)
 ├── schemas/                # topology.schema.json
-├── docs/                   # algorithm-formulas.md, user-manual.md, validation-report.md
+├── docs/                   # algorithm-formulas.md, user-manual.md, validation-report.md, debug-log.md
 └── validation/             # 4 verification case studies
 ```
 
 ## Features
 
-### C++ Engine (139 tests)
+### C++ Engine (166 tests)
 - **求解器**: Newton-Raphson + 信赖域 + 亚松弛 + PCG (BiCGSTAB) + RCM 节点重排序
 - **13 种气流元件**: 幂律孔口, Brown-Solvason 双向流, 风扇(多项式曲线), 风管(Darcy-Weisbach), 阀门, 过滤器, 自调节通风口, 单向阀, 二次元件, 逆止阀, 粒子过滤器, 送风口, 回风口
 - **4 种源类型**: 恒定源, 指数衰减源, 压力驱动源, 浓度切断源
@@ -119,10 +120,13 @@ contam-next/
 
 - ✅ Phase 0–8: 引擎核心 + 前端基础 + Python API + HDF5
 - ✅ Sprint 1–6: Canvas 编辑器 + 控制系统 + CI/CD
-- ✅ 高级功能: ChemKinetics + AxleyBLD + Aerosol + SuperFilter + RCM + 13 元件 (**139 tests**)
+- ✅ 高级功能: ChemKinetics + AxleyBLD + Aerosol + SuperFilter + RCM + 13 元件 (**166 tests**)
 - ✅ Canvas 迁移: Konva → HTML5 Canvas 2D (Excalidraw 风格)
-- ✅ 控制流可视化: React Flow + 5 种自定义节点
+- ✅ 控制流可视化: React Flow + 5 种自定义节点 + DAG 环路检测
+- ✅ 前端测试: 25 Vitest 用例 (store CRUD, DAG 验证, 文件操作)
+- ✅ 暗色模式: 全组件 theme-aware 颜色 (无硬编码)
+- ✅ CI/CD: GitHub Actions (三平台引擎测试 + 前端 tsc/vitest/build + Tauri 打包)
+- ✅ 引擎集成: JSON 解析气象/AHS/人员, SimpleGaseousFilter, UVGI 过滤器, HDF5 输出
 - 🔲 结果叠加层接入 (流向箭头, 浓度热力图, 压力标签, 风压矢量)
-- 🔲 前端测试 (Vitest + Playwright)
 - 🔲 Tauri 原生文件对话框
 - 🔲 StateNode 层级状态机启用
