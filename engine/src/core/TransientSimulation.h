@@ -8,6 +8,8 @@
 #include "control/Controller.h"
 #include "control/Actuator.h"
 #include "Occupant.h"
+#include "SimpleAHS.h"
+#include "io/WeatherReader.h"
 #include <vector>
 #include <map>
 #include <functional>
@@ -61,6 +63,12 @@ public:
     // Occupants (exposure tracking + mobile pollution sources)
     void setOccupants(const std::vector<Occupant>& occupants) { occupants_ = occupants; }
 
+    // Weather data (time-varying outdoor conditions)
+    void setWeatherData(const std::vector<WeatherRecord>& weather) { weatherData_ = weather; }
+
+    // Simple AHS (HVAC systems)
+    void setAHSystems(const std::vector<SimpleAHS>& systems) { ahSystems_ = systems; }
+
     // Optional progress callback: (currentTime, endTime) -> bool (return false to cancel)
     using ProgressCallback = std::function<bool(double, double)>;
     void setProgressCallback(ProgressCallback cb) { progressCb_ = cb; }
@@ -78,6 +86,8 @@ private:
     std::vector<Actuator> actuators_;
     std::vector<Occupant> occupants_;
     std::map<int, int> zoneTempSchedules_;  // nodeIdx -> scheduleId
+    std::vector<WeatherRecord> weatherData_;
+    std::vector<SimpleAHS> ahSystems_;
     ProgressCallback progressCb_;
 
     // Control system helpers
@@ -91,6 +101,12 @@ private:
 
     // Zone temperature schedule update
     void updateZoneTemperatures(Network& network, double t);
+
+    // Weather-driven boundary condition update
+    void updateWeatherConditions(Network& network, double t);
+
+    // AHS flow injection
+    void applyAHSFlows(Network& network, ContaminantSolver& contSolver, double t);
 
     // Occupant exposure + mobile source injection
     void updateOccupantExposure(const ContaminantSolver& contSolver, double t, double dt);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, WeatherConfig } from '../types';
 
 export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Model data
@@ -24,6 +24,10 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   occupants: [],
   controlSystem: { sensors: [], controllers: [], actuators: [] },
   transientConfig: { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
+
+  // Weather & AHS
+  weatherConfig: { enabled: false, filePath: '', records: [] },
+  ahsSystems: [],
 
   // Simulation
   result: null,
@@ -121,6 +125,17 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
   })),
   setTransientResult: (result: TransientResult | null) => set({ transientResult: result }),
 
+  setWeatherConfig: (config) => set((state) => ({
+    weatherConfig: { ...state.weatherConfig, ...config },
+  })),
+  addAHS: (ahs: AHSConfig) => set((state) => ({ ahsSystems: [...state.ahsSystems, ahs] })),
+  updateAHS: (id: number, updates) => set((state) => ({
+    ahsSystems: state.ahsSystems.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+  })),
+  removeAHS: (id: number) => set((state) => ({
+    ahsSystems: state.ahsSystems.filter((a) => a.id !== id),
+  })),
+
   exportTopology: (): TopologyJson => {
     const state = get();
     const ambientNodes = state.nodes.filter((n) => n.type === 'ambient');
@@ -156,6 +171,8 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
       occupants: state.occupants.length > 0 ? state.occupants : undefined,
       controls: (state.controlSystem.sensors.length > 0 || state.controlSystem.controllers.length > 0 || state.controlSystem.actuators.length > 0) ? state.controlSystem : undefined,
       transient: state.species.length > 0 ? state.transientConfig : undefined,
+      weather: state.weatherConfig.enabled ? state.weatherConfig : undefined,
+      ahsSystems: state.ahsSystems.length > 0 ? state.ahsSystems : undefined,
     };
   },
 
@@ -213,6 +230,8 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
       occupants: json.occupants ?? [],
       controlSystem: json.controls ?? { sensors: [], controllers: [], actuators: [] },
       transientConfig: json.transient ?? { startTime: 0, endTime: 3600, timeStep: 60, outputInterval: 60 },
+      weatherConfig: json.weather ?? { enabled: false, filePath: '', records: [] },
+      ahsSystems: json.ahsSystems ?? [],
       result: null,
       transientResult: null,
       error: null,
@@ -230,6 +249,8 @@ export const useAppStore = create<AppState>()(temporal((set, get) => ({
     controlSystem: { sensors: [], controllers: [], actuators: [] },
     selectedNodeId: null,
     selectedLinkId: null,
+    weatherConfig: { enabled: false, filePath: '', records: [] },
+    ahsSystems: [],
     result: null,
     transientResult: null,
     error: null,

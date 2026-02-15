@@ -12,6 +12,7 @@
 
 import { useRef, useEffect, useCallback } from 'react';
 import { useCanvasStore } from '../store/useCanvasStore';
+import { useAppStore } from '../store/useAppStore';
 import type { Camera2D } from './camera2d';
 import {
   DEFAULT_CAMERA,
@@ -21,7 +22,10 @@ import {
   drawDotGrid, drawZones, drawWalls, drawVertices,
   drawPlacements, drawWallPreview, drawRectPreview,
   drawCrosshair, readThemeColors,
+  drawFlowArrows, drawPressureLabels, drawConcentrationHeatmap,
   type ThemeColors,
+  type EdgeFlowResult,
+  type ZoneConcentrationResult,
 } from './renderer';
 import {
   constrainOrthogonal, findNearestVertex,
@@ -31,6 +35,7 @@ import { CanvasContextMenu } from './components/ContextMenu';
 import { FloorSwitcher } from './components/FloorSwitcher';
 import { ZoomControls } from './components/ZoomControls';
 import { TimeStepper } from './components/TimeStepper';
+import { FloatingStatusBox } from './components/FloatingStatusBox';
 
 export default function Canvas2D() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -60,6 +65,12 @@ export default function Canvas2D() {
   // Mark dirty whenever store changes
   useEffect(() => {
     const unsub = useCanvasStore.subscribe(() => { dirtyRef.current = true; });
+    return unsub;
+  }, []);
+
+  // Mark dirty when simulation results change
+  useEffect(() => {
+    const unsub = useAppStore.subscribe(() => { dirtyRef.current = true; });
     return unsub;
   }, []);
 
@@ -155,6 +166,78 @@ export default function Canvas2D() {
     // 8. Crosshair (screen space, only in drawing modes)
     if (['wall', 'rect', 'door', 'window'].includes(state.toolMode)) {
       drawCrosshair(ctx, cursorScreenRef.current.x, cursorScreenRef.current.y, colors);
+    }
+
+    // 9. Results overlays (only in results mode)
+    if (state.appMode === 'results') {
+      const appState = useAppStore.getState();
+      const result = appState.result;
+
+      if (result) {
+        // Map link results to edge flow data via placements
+        const edgeFlows: EdgeFlowResult[] = [];
+        const zoneConcs: ZoneConcentrationResult[] = [];
+
+        // Build zoneId→faceId lookup from zone assignments
+        const zoneIdToFaceId = new Map<number, string>();
+        for (const z of story.zoneAssignments) {
+          zoneIdToFaceId.set(z.zoneId, z.faceId);
+        }
+
+        // Build edge→(fromZoneId, toZoneId) lookup from placements
+        for (const placement of story.placements) {
+          const edge = geo.edges.find(e => e.id === placement.edgeId);
+          if (!edge) continue;
+
+          const faceIds = edge.faceIds;
+          let fromZoneId = 0, toZoneId = 0;
+          if (faceIds.length === 2) {
+            const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
+            const z2 = story.zoneAssignments.find(z => z.faceId === faceIds[1]);
+            fromZoneId = z1?.zoneId ?? 0;
+            toZoneId = z2?.zoneId ?? 0;
+          } else if (faceIds.length === 1) {
+            const z1 = story.zoneAssignments.find(z => z.faceId === faceIds[0]);
+            fromZoneId = z1?.zoneId ?? 0;
+            toZoneId = 0;
+          }
+
+          // Find matching link result
+          const linkResult = result.links.find(l =>
+            (l.from === fromZoneId && l.to === toZoneId) ||
+            (l.from === toZoneId && l.to === fromZoneId)
+          );
+          if (linkResult) {
+            const sign = linkResult.from === fromZoneId ? 1 : -1;
+            edgeFlows.push({
+              edgeId: placement.edgeId,
+              massFlow: linkResult.massFlow * sign,
+              deltaP: 0, // steady-state doesn't expose per-link deltaP directly
+            });
+          }
+        }
+
+        // Map node results to zone concentration data
+        for (const nodeRes of result.nodes) {
+          const faceId = zoneIdToFaceId.get(nodeRes.id);
+          if (faceId) {
+            zoneConcs.push({
+              faceId,
+              concentration: nodeRes.pressure, // use pressure for heatmap in steady-state
+              pressure: nodeRes.pressure,
+            });
+          }
+        }
+
+        // Draw overlays
+        if (edgeFlows.length > 0) {
+          drawFlowArrows(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
+          drawPressureLabels(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
+        }
+        if (zoneConcs.length > 0) {
+          drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH);
+        }
+      }
     }
 
     rafRef.current = requestAnimationFrame(render);
@@ -505,6 +588,7 @@ export default function Canvas2D() {
       <ZoomControls />
       <FloorSwitcher />
       <TimeStepper />
+      <FloatingStatusBox />
       <CanvasContextMenu />
     </div>
   );

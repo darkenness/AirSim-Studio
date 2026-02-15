@@ -3,6 +3,9 @@
 #include "core/TransientSimulation.h"
 #include "io/JsonReader.h"
 #include "io/JsonWriter.h"
+#ifdef CONTAM_HAS_HDF5
+#include "io/Hdf5Writer.h"
+#endif
 #include <iostream>
 #include <string>
 
@@ -13,6 +16,9 @@ void printUsage(const char* progName) {
               << "  -i <file>    Input JSON file (required)\n"
               << "  -o <file>    Output results JSON file (required)\n"
               << "  -m <method>  Solver method: 'sur' or 'tr' (default: tr)\n"
+#ifdef CONTAM_HAS_HDF5
+              << "  --hdf5 <file> Also write results to HDF5 file\n"
+#endif
               << "  -v           Verbose output\n"
               << "  -h           Show this help\n"
               << "\nTransient mode is auto-detected when input contains 'species' and/or 'transient' sections.\n";
@@ -21,6 +27,7 @@ void printUsage(const char* progName) {
 int main(int argc, char* argv[]) {
     std::string inputFile;
     std::string outputFile;
+    std::string hdf5File;
     contam::SolverMethod method = contam::SolverMethod::TrustRegion;
     bool verbose = false;
 
@@ -38,6 +45,12 @@ int main(int argc, char* argv[]) {
                 std::cerr << "Unknown solver method: " << m << std::endl;
                 return 1;
             }
+        } else if (arg == "--hdf5" && i + 1 < argc) {
+            hdf5File = argv[++i];
+#ifndef CONTAM_HAS_HDF5
+            std::cerr << "Warning: --hdf5 flag ignored (HDF5 support not compiled in)" << std::endl;
+            hdf5File.clear();
+#endif
         } else if (arg == "-v") {
             verbose = true;
         } else if (arg == "-h") {
@@ -86,6 +99,14 @@ int main(int argc, char* argv[]) {
             sim.setSpecies(model.species);
             sim.setSources(model.sources);
             sim.setSchedules(model.schedules);
+            sim.setZoneTemperatureSchedules(model.zoneTemperatureSchedules);
+            sim.setOccupants(model.occupants);
+            if (!model.weatherData.empty()) {
+                sim.setWeatherData(model.weatherData);
+            }
+            if (!model.ahSystems.empty()) {
+                sim.setAHSystems(model.ahSystems);
+            }
 
             if (verbose) {
                 sim.setProgressCallback([](double t, double end) {
@@ -103,6 +124,13 @@ int main(int argc, char* argv[]) {
 
             contam::JsonWriter::writeTransientToFile(outputFile, model.network, result, model.species);
             if (verbose) std::cout << "Results written to: " << outputFile << std::endl;
+
+#ifdef CONTAM_HAS_HDF5
+            if (!hdf5File.empty()) {
+                contam::Hdf5Writer::writeTransient(hdf5File, model.network, model.species, result);
+                if (verbose) std::cout << "HDF5 results written to: " << hdf5File << std::endl;
+            }
+#endif
 
             return result.completed ? 0 : 2;
 
@@ -125,6 +153,13 @@ int main(int argc, char* argv[]) {
 
             contam::JsonWriter::writeToFile(outputFile, model.network, result);
             if (verbose) std::cout << "Results written to: " << outputFile << std::endl;
+
+#ifdef CONTAM_HAS_HDF5
+            if (!hdf5File.empty()) {
+                contam::Hdf5Writer::writeSteadyState(hdf5File, model.network, result);
+                if (verbose) std::cout << "HDF5 results written to: " << hdf5File << std::endl;
+            }
+#endif
 
             return result.converged ? 0 : 2;
         }

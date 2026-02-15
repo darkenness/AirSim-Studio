@@ -1,17 +1,17 @@
 import { useAppStore } from '../../store/useAppStore';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { Play, Save, FolderOpen, Undo2, Redo2, Trash2, Moon, Sun, FileDown } from 'lucide-react';
-import { useRef, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '../ui/alert-dialog';
 import { toast } from '../../hooks/use-toast';
-import { canvasToTopology, validateModel, steadyResultToCSV, transientResultToCSV, downloadAsFile } from '../../model/dataBridge';
+import { canvasToTopology, validateModel, steadyResultToCSV, transientResultToCSV } from '../../model/dataBridge';
+import { saveFile, openFile, downloadFile } from '../../utils/fileOps';
 
 export default function TopBar() {
   const { isRunning, clearAll, setResult, setIsRunning, setError, loadFromJson, species, setTransientResult, result, transientResult } = useAppStore();
   const setAppMode = useCanvasStore(s => s.setAppMode);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const isTransient = species.length > 0;
   const [isDark, setIsDark] = useState(document.documentElement.classList.contains('dark'));
   const hasResults = result !== null || transientResult !== null;
@@ -21,13 +21,13 @@ export default function TopBar() {
     setIsDark(!isDark);
   }, [isDark]);
 
-  const handleExportCSV = useCallback(() => {
+  const handleExportCSV = useCallback(async () => {
     if (transientResult) {
       const csv = transientResultToCSV();
-      if (csv) downloadAsFile(csv, 'transient_results.csv');
+      if (csv) await downloadFile(csv, 'transient_results.csv');
     } else if (result) {
       const csv = steadyResultToCSV();
-      if (csv) downloadAsFile(csv, 'steady_results.csv');
+      if (csv) await downloadFile(csv, 'steady_results.csv');
     }
   }, [result, transientResult]);
 
@@ -106,31 +106,30 @@ export default function TopBar() {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const topology = canvasToTopology();
-    const blob = new Blob([JSON.stringify(topology, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'model.contam.json'; a.click();
-    URL.revokeObjectURL(url);
-    toast({ title: '已保存', description: 'model.contam.json' });
+    const content = JSON.stringify(topology, null, 2);
+    const saved = await saveFile(content, 'model.contam.json', [
+      { name: 'CONTAM JSON', extensions: ['contam.json', 'json'] },
+    ]);
+    if (saved) {
+      const name = saved.split(/[\\/]/).pop() ?? saved;
+      toast({ title: '已保存', description: name });
+    }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const json = JSON.parse(ev.target?.result as string);
-        loadFromJson(json);
-        toast({ title: '已加载', description: file.name });
-      } catch (err) {
-        setError(`文件解析失败: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+  const handleOpen = async () => {
+    const result = await openFile([
+      { name: 'CONTAM JSON', extensions: ['contam.json', 'json'] },
+    ]);
+    if (!result) return;
+    try {
+      const json = JSON.parse(result.content);
+      loadFromJson(json);
+      toast({ title: '已加载', description: result.name });
+    } catch (err) {
+      setError(`文件解析失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   return (
@@ -226,10 +225,9 @@ export default function TopBar() {
           <TooltipContent side="bottom" className="text-xs rounded-xl">保存</TooltipContent>
         </Tooltip>
 
-        <input ref={fileInputRef} type="file" accept=".json,.contam.json" onChange={handleFileChange} className="hidden" />
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={() => fileInputRef.current?.click()}><FolderOpen size={15} /></Button>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={handleOpen}><FolderOpen size={15} /></Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">打开</TooltipContent>
         </Tooltip>

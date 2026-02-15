@@ -7,11 +7,11 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold text-slate-500 tracking-wider">{label}</span>
+      <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">{label}</span>
       <div className="flex items-center gap-1">
         <input type={type} value={value} step={step} onChange={(e) => onChange(e.target.value)}
           className="flex-1 px-2 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background" />
-        {unit && <span className="text-[10px] text-slate-400 min-w-[24px]">{unit}</span>}
+        {unit && <span className="text-[10px] text-muted-foreground min-w-[24px]">{unit}</span>}
       </div>
     </label>
   );
@@ -36,6 +36,10 @@ function SpeciesSection() {
       molarMass: 0.029,
       decayRate: 0,
       outdoorConcentration: 0,
+      isTrace: true,
+      diffusionCoeff: 0,
+      meanDiameter: 0,
+      effectiveDensity: 0,
     });
   };
 
@@ -47,6 +51,10 @@ function SpeciesSection() {
       molarMass: tpl.molarMass,
       decayRate: tpl.decayRate,
       outdoorConcentration: tpl.outdoorConc,
+      isTrace: true,
+      diffusionCoeff: 0,
+      meanDiameter: tpl.molarMass === 0 ? 2.5e-6 : 0,
+      effectiveDensity: tpl.molarMass === 0 ? 1000 : 0,
     });
   };
 
@@ -55,7 +63,7 @@ function SpeciesSection() {
       <div className="flex items-center gap-2">
         <FlaskConical size={14} className="text-purple-500" />
         <span className="text-xs font-bold text-foreground">污染物种类</span>
-        <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-purple-50 text-slate-400 hover:text-purple-500">
+        <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-purple-500">
           <Plus size={14} />
         </button>
       </div>
@@ -79,12 +87,12 @@ function SpeciesSection() {
       )}
 
       {species.map((sp) => (
-        <div key={sp.id} className="border border-slate-100 rounded-md p-2 flex flex-col gap-1.5 bg-white">
+        <div key={sp.id} className="border border-border rounded-md p-2 flex flex-col gap-1.5 bg-card">
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-purple-500 font-bold">#{sp.id}</span>
             <input value={sp.name} onChange={(e) => updateSpecies(sp.id, { name: e.target.value })}
-              className="flex-1 px-1.5 py-0.5 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-purple-300" />
-            <button onClick={() => removeSpecies(sp.id)} className="p-0.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500">
+              className="flex-1 px-1.5 py-0.5 text-xs border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
+            <button onClick={() => removeSpecies(sp.id)} className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
               <Trash2 size={12} />
             </button>
           </div>
@@ -134,13 +142,13 @@ function SourceSection() {
         <Flame size={14} className="text-orange-500" />
         <span className="text-xs font-bold text-foreground">源/汇</span>
         <button onClick={handleAdd} disabled={rooms.length === 0 || species.length === 0}
-          className="ml-auto p-0.5 rounded hover:bg-orange-50 text-slate-400 hover:text-orange-500 disabled:opacity-30">
+          className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-orange-500 disabled:opacity-30">
           <Plus size={14} />
         </button>
       </div>
 
       {sources.length === 0 && (
-        <p className="text-[10px] text-slate-400 italic">
+        <p className="text-[10px] text-muted-foreground italic">
           {species.length === 0 ? '请先添加污染物种类。' : '尚未添加源。点击 + 添加。'}
         </p>
       )}
@@ -152,22 +160,22 @@ function SourceSection() {
           <div key={idx} className="border border-border rounded-md p-2 flex flex-col gap-1.5 bg-card">
             <div className="flex items-center gap-1 text-[10px]">
               <span className="text-orange-500 font-bold">{zone?.name ?? `#${src.zoneId}`}</span>
-              <span className="text-slate-300">→</span>
+              <span className="text-muted-foreground">→</span>
               <span className="text-purple-500 font-bold">{sp?.name ?? `#${src.speciesId}`}</span>
-              <button onClick={() => removeSource(idx)} className="ml-auto p-0.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500">
+              <button onClick={() => removeSource(idx)} className="ml-auto p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive">
                 <Trash2 size={12} />
               </button>
             </div>
             <div className="grid grid-cols-2 gap-1.5">
               <label className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-semibold text-slate-500">区域</span>
+                <span className="text-[10px] font-semibold text-muted-foreground">区域</span>
                 <select value={src.zoneId} onChange={(e) => updateSource(idx, { zoneId: parseInt(e.target.value) })}
                   className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
                   {rooms.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </label>
               <label className="flex flex-col gap-0.5">
-                <span className="text-[10px] font-semibold text-slate-500">污染物</span>
+                <span className="text-[10px] font-semibold text-muted-foreground">污染物</span>
                 <select value={src.speciesId} onChange={(e) => updateSource(idx, { speciesId: parseInt(e.target.value) })}
                   className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
                   {species.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -175,9 +183,9 @@ function SourceSection() {
               </label>
             </div>
             <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-semibold text-slate-500">源类型</span>
+              <span className="text-[10px] font-semibold text-muted-foreground">源类型</span>
               <select value={src.type ?? 'Constant'} onChange={(e) => updateSource(idx, { type: e.target.value as import('../../types').SourceType })}
-                className="px-1.5 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
+                className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
                 <option value="Constant">恒定源</option>
                 <option value="ExponentialDecay">指数衰减源</option>
                 <option value="PressureDriven">压力驱动源</option>
@@ -220,7 +228,7 @@ function TransientSection() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Clock size={14} className="text-teal-500" />
-        <span className="text-xs font-bold text-slate-700">瞬态配置</span>
+        <span className="text-xs font-bold text-foreground">瞬态配置</span>
       </div>
       <div className="grid grid-cols-2 gap-1.5">
         <InputField label="起始时间" value={transientConfig.startTime} unit="s" type="number" step="60"
@@ -242,11 +250,11 @@ export default function ContaminantPanel() {
   return (
     <div className="flex flex-col gap-3">
       <SpeciesSection />
-      <div className="border-t border-slate-100" />
+      <div className="border-t border-border" />
       <SourceSection />
       {species.length > 0 && (
         <>
-          <div className="border-t border-slate-100" />
+          <div className="border-t border-border" />
           <TransientSection />
         </>
       )}

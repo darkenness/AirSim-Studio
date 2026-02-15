@@ -30,11 +30,35 @@ const nodeTypes = {
   logic: LogicNode,
 };
 
+// Cycle detection: DFS from target to see if we can reach source
+function wouldCreateCycle(source: string, target: string, edges: Edge[]): boolean {
+  const adj = new Map<string, string[]>();
+  for (const e of edges) {
+    if (!adj.has(e.source)) adj.set(e.source, []);
+    adj.get(e.source)!.push(e.target);
+  }
+  // Check if there's a path from target → source (which would form a cycle)
+  const visited = new Set<string>();
+  const stack = [target];
+  while (stack.length > 0) {
+    const node = stack.pop()!;
+    if (node === source) return true;
+    if (visited.has(node)) continue;
+    visited.add(node);
+    for (const next of adj.get(node) ?? []) {
+      stack.push(next);
+    }
+  }
+  return false;
+}
+
 // Connection validation: enforce DAG rules
-function isValidConnection(connection: Edge | Connection): boolean {
+function isValidConnection(connection: Edge | Connection, existingEdges: Edge[]): boolean {
   // Prevent self-connections
   if (connection.source === connection.target) return false;
-  // TODO: Prevent cycles (full DAG check)
+  if (!connection.source || !connection.target) return false;
+  // Prevent cycles
+  if (wouldCreateCycle(connection.source, connection.target, existingEdges)) return false;
   return true;
 }
 
@@ -114,13 +138,17 @@ export default function ControlFlowCanvas() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
 
   const onConnect = useCallback((params: Connection) => {
-    if (!isValidConnection(params)) return;
+    if (!isValidConnection(params, edges)) return;
     setEdges((eds) => addEdge({
       ...params,
       animated: true,
       markerEnd: { type: MarkerType.ArrowClosed },
     }, eds));
-  }, [setEdges]);
+  }, [setEdges, edges]);
+
+  const checkConnection = useCallback((conn: Edge | Connection) => {
+    return isValidConnection(conn, edges);
+  }, [edges]);
 
   return (
     <div className="w-full h-full">
@@ -130,7 +158,7 @@ export default function ControlFlowCanvas() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        isValidConnection={isValidConnection}
+        isValidConnection={checkConnection}
         nodeTypes={nodeTypes}
         fitView
         minZoom={0.3}

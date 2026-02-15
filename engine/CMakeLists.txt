@@ -88,10 +88,16 @@ set(ENGINE_SOURCES
     src/elements/SimpleParticleFilter.cpp
     src/elements/SupplyDiffuser.cpp
     src/elements/ReturnGrille.cpp
+    src/elements/SimpleGaseousFilter.cpp
+    src/elements/UVGIFilter.cpp
     src/io/JsonReader.cpp
     src/io/JsonWriter.cpp
     src/utils/Constants.cpp
 )
+
+if(CONTAM_ENABLE_HDF5)
+    list(APPEND ENGINE_SOURCES src/io/Hdf5Writer.cpp)
+endif()
 
 add_library(contam_engine_lib STATIC ${ENGINE_SOURCES})
 
@@ -103,6 +109,12 @@ target_link_libraries(contam_engine_lib PUBLIC
     Eigen3::Eigen
     nlohmann_json::nlohmann_json
 )
+
+if(CONTAM_ENABLE_HDF5)
+    target_compile_definitions(contam_engine_lib PUBLIC CONTAM_HAS_HDF5)
+    target_link_libraries(contam_engine_lib PUBLIC HighFive ${HDF5_C_LIBRARIES})
+    target_include_directories(contam_engine_lib PUBLIC ${HDF5_INCLUDE_DIRS})
+endif()
 
 # ── CLI Executable ─────────────────────────────────────────────────────
 add_executable(contam_engine src/main.cpp)

@@ -93,6 +93,10 @@ export interface Species {
   molarMass: number;
   decayRate: number;
   outdoorConcentration: number;
+  isTrace: boolean;
+  diffusionCoeff: number;
+  meanDiameter: number;
+  effectiveDensity: number;
 }
 
 export type SourceType = 'Constant' | 'ExponentialDecay' | 'PressureDriven' | 'CutoffConcentration';
@@ -176,6 +180,8 @@ export interface TopologyJson {
   occupants?: Occupant[];
   controls?: ControlSystem;
   transient?: TransientConfig;
+  weather?: WeatherConfig;
+  ahsSystems?: AHSConfig[];
 }
 
 // ── Occupant ────────────────────────────────────────────────────────
@@ -226,6 +232,44 @@ export interface ControlSystem {
   actuators: ActuatorDef[];
 }
 
+// ── Weather ─────────────────────────────────────────────────────────
+export interface WeatherRecord {
+  month: number;
+  day: number;
+  hour: number;
+  temperature: number;   // K
+  windSpeed: number;     // m/s
+  windDirection: number; // degrees (0=N, 90=E)
+  pressure: number;      // Pa (absolute)
+  humidity: number;      // 0~1
+}
+
+export interface WeatherConfig {
+  enabled: boolean;
+  filePath: string;       // .wth file path (empty = not loaded)
+  records: WeatherRecord[];
+}
+
+// ── Air Handling System ─────────────────────────────────────────────
+export interface AHSZoneConnection {
+  zoneId: number;
+  fraction: number; // 0~1, fraction of total flow to this zone
+}
+
+export interface AHSConfig {
+  id: number;
+  name: string;
+  supplyFlow: number;       // m³/s
+  returnFlow: number;       // m³/s
+  outdoorAirFlow: number;   // m³/s
+  exhaustFlow: number;      // m³/s
+  supplyTemperature: number; // K
+  supplyZones: AHSZoneConnection[];
+  returnZones: AHSZoneConnection[];
+  outdoorAirScheduleId: number;  // -1 = constant
+  supplyFlowScheduleId: number;  // -1 = constant
+}
+
 // ── UI State ─────────────────────────────────────────────────────────
 export type ToolMode = 'select' | 'addRoom' | 'addAmbient' | 'addLink';
 
@@ -251,6 +295,10 @@ export interface AppState {
   occupants: Occupant[];
   controlSystem: ControlSystem;
   transientConfig: TransientConfig;
+
+  // Weather & AHS
+  weatherConfig: WeatherConfig;
+  ahsSystems: AHSConfig[];
 
   // Simulation
   result: SimulationResult | null;
@@ -285,6 +333,10 @@ export interface AppState {
   setControlSystem: (cs: ControlSystem) => void;
   setTransientConfig: (config: Partial<TransientConfig>) => void;
   setTransientResult: (result: TransientResult | null) => void;
+  setWeatherConfig: (config: Partial<WeatherConfig>) => void;
+  addAHS: (ahs: AHSConfig) => void;
+  updateAHS: (id: number, updates: Partial<AHSConfig>) => void;
+  removeAHS: (id: number) => void;
   exportTopology: () => TopologyJson;
   loadFromJson: (json: TopologyJson) => void;
   clearAll: () => void;

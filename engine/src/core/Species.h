@@ -30,7 +30,8 @@ enum class SourceType {
     Constant,           // S = G * schedule(t) - R * C  (constant coefficient)
     ExponentialDecay,   // S = mult * G0 * exp(-t_elapsed / tau_c)  (liquid spill, spray)
     PressureDriven,     // Source driven by pressure difference
-    CutoffConcentration // Source with concentration cutoff
+    CutoffConcentration,// Source with concentration cutoff
+    Burst               // S = burstMass / burstDuration when t ∈ [burstTime, burstTime+burstDuration]
 };
 
 // Source/Sink model for a species in a zone
@@ -53,18 +54,25 @@ struct Source {
     // CutoffConcentration specific:
     double cutoffConc;        // concentration threshold (kg/m³), source stops when C >= cutoff
 
+    // Burst specific:
+    double burstMass;         // kg, total mass released during burst
+    double burstTime;         // s, time when burst starts
+    double burstDuration;     // s, duration of burst (G = burstMass/burstDuration)
+
     Source()
         : zoneId(0), speciesId(0), type(SourceType::Constant),
           generationRate(0.0), removalRate(0.0), scheduleId(-1),
           decayTimeConstant(3600.0), startTime(0.0), multiplier(1.0),
-          pressureCoeff(0.0), cutoffConc(0.0) {}
+          pressureCoeff(0.0), cutoffConc(0.0),
+          burstMass(0.0), burstTime(0.0), burstDuration(1.0) {}
 
     Source(int zoneId, int speciesId, double genRate, double remRate = 0.0,
            int schedId = -1)
         : zoneId(zoneId), speciesId(speciesId), type(SourceType::Constant),
           generationRate(genRate), removalRate(remRate), scheduleId(schedId),
           decayTimeConstant(3600.0), startTime(0.0), multiplier(1.0),
-          pressureCoeff(0.0), cutoffConc(0.0) {}
+          pressureCoeff(0.0), cutoffConc(0.0),
+          burstMass(0.0), burstTime(0.0), burstDuration(1.0) {}
 
     // Factory for exponential decay source
     static Source makeDecay(int zoneId, int speciesId, double G0, double tauC,
@@ -98,6 +106,18 @@ struct Source {
         s.type = SourceType::CutoffConcentration;
         s.generationRate = genRate;
         s.cutoffConc = cutoff;
+        return s;
+    }
+
+    // Factory for burst source: G = burstMass/burstDuration when t ∈ [burstTime, burstTime+burstDuration]
+    static Source makeBurst(int zoneId, int speciesId, double mass, double time, double duration) {
+        Source s;
+        s.zoneId = zoneId;
+        s.speciesId = speciesId;
+        s.type = SourceType::Burst;
+        s.burstMass = mass;
+        s.burstTime = time;
+        s.burstDuration = (duration > 0.0) ? duration : 1.0;
         return s;
     }
 };

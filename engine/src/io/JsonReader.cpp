@@ -7,6 +7,8 @@
 #include "elements/Filter.h"
 #include "elements/SelfRegulatingVent.h"
 #include "elements/CheckValve.h"
+#include "elements/SimpleGaseousFilter.h"
+#include "elements/UVGIFilter.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <stdexcept>
@@ -201,6 +203,39 @@ Network JsonReader::readFromString(const std::string& jsonStr) {
                     double C = elemDef["C"].get<double>();
                     double n = elemDef["n"].get<double>();
                     link.setFlowElement(std::make_unique<CheckValve>(C, n));
+                } else if (elemType == "SimpleGaseousFilter") {
+                    double C = elemDef["C"].get<double>();
+                    double n = elemDef["n"].get<double>();
+                    double breakthrough = elemDef.value("breakthroughThreshold", 0.05);
+                    std::vector<SimpleGaseousFilter::LoadingPoint> loadingTable;
+                    if (elemDef.contains("loadingTable")) {
+                        for (auto& lp : elemDef["loadingTable"]) {
+                            loadingTable.push_back({
+                                lp["loading"].get<double>(),
+                                lp["efficiency"].get<double>()
+                            });
+                        }
+                    }
+                    if (loadingTable.size() >= 2) {
+                        link.setFlowElement(std::make_unique<SimpleGaseousFilter>(
+                            C, n, loadingTable, breakthrough));
+                    }
+                } else if (elemType == "UVGIFilter") {
+                    double C = elemDef["C"].get<double>();
+                    double n = elemDef["n"].get<double>();
+                    UVGIFilter::UVGIParams params;
+                    params.k = elemDef.value("k", 0.0);
+                    params.irradiance = elemDef.value("irradiance", 0.0);
+                    params.chamberVolume = elemDef.value("chamberVolume", 0.001);
+                    params.agingRate = elemDef.value("agingRate", 0.0);
+                    params.lampAgeHours = elemDef.value("lampAgeHours", 0.0);
+                    if (elemDef.contains("tempCoeffs")) {
+                        params.tempCoeffs = elemDef["tempCoeffs"].get<std::vector<double>>();
+                    }
+                    if (elemDef.contains("flowCoeffs")) {
+                        params.flowCoeffs = elemDef["flowCoeffs"].get<std::vector<double>>();
+                    }
+                    link.setFlowElement(std::make_unique<UVGIFilter>(C, n, params));
                 }
             }
 
@@ -267,6 +302,11 @@ ModelInput JsonReader::readModelFromString(const std::string& jsonStr) {
             } else if (srcType == "CutoffConcentration") {
                 src.type = SourceType::CutoffConcentration;
                 src.cutoffConc = jsrc.value("cutoffConcentration", 0.0);
+            } else if (srcType == "Burst") {
+                src.type = SourceType::Burst;
+                src.burstMass = jsrc.value("burstMass", 0.0);
+                src.burstTime = jsrc.value("burstTime", 0.0);
+                src.burstDuration = jsrc.value("burstDuration", 1.0);
             }
 
             model.sources.push_back(src);
@@ -310,6 +350,73 @@ ModelInput JsonReader::readModelFromString(const std::string& jsonStr) {
         std::string method = jt.value("airflowMethod", "trustRegion");
         if (method == "subRelaxation") {
             model.transientConfig.airflowMethod = SolverMethod::SubRelaxation;
+        }
+    }
+
+    // Parse weather data
+    if (j.contains("weather") && j["weather"].contains("records")) {
+        for (auto& jw : j["weather"]["records"]) {
+            WeatherRecord rec;
+            rec.month = jw.value("month", 1);
+            rec.day = jw.value("day", 1);
+            rec.hour = jw.value("hour", 1);
+            rec.temperature = jw.value("temperature", 293.15);
+            rec.windSpeed = jw.value("windSpeed", 0.0);
+            rec.windDirection = jw.value("windDirection", 0.0);
+            rec.pressure = jw.value("pressure", 101325.0);
+            rec.humidity = jw.value("humidity", 0.5);
+            model.weatherData.push_back(rec);
+        }
+    }
+
+    // Parse AHS systems
+    if (j.contains("ahsSystems")) {
+        for (auto& ja : j["ahsSystems"]) {
+            SimpleAHS ahs;
+            ahs.id = ja["id"].get<int>();
+            ahs.name = ja.value("name", "AHS_" + std::to_string(ahs.id));
+            ahs.supplyFlow = ja.value("supplyFlow", 0.1);
+            ahs.returnFlow = ja.value("returnFlow", 0.1);
+            ahs.outdoorAirFlow = ja.value("outdoorAirFlow", 0.02);
+            ahs.exhaustFlow = ja.value("exhaustFlow", 0.02);
+            ahs.supplyTemperature = ja.value("supplyTemperature", 295.15);
+            ahs.outdoorAirScheduleId = ja.value("outdoorAirScheduleId", -1);
+            ahs.supplyFlowScheduleId = ja.value("supplyFlowScheduleId", -1);
+            if (ja.contains("supplyZones")) {
+                for (auto& jz : ja["supplyZones"]) {
+                    ahs.supplyZones.push_back({jz["zoneId"].get<int>(), jz.value("fraction", 1.0)});
+                }
+            }
+            if (ja.contains("returnZones")) {
+                for (auto& jz : ja["returnZones"]) {
+                    ahs.returnZones.push_back({jz["zoneId"].get<int>(), jz.value("fraction", 1.0)});
+                }
+            }
+            model.ahSystems.push_back(ahs);
+        }
+    }
+
+    // Parse occupants
+    if (j.contains("occupants")) {
+        for (auto& jo : j["occupants"]) {
+            Occupant occ;
+            occ.id = jo["id"].get<int>();
+            occ.name = jo.value("name", "Occupant_" + std::to_string(occ.id));
+            occ.breathingRate = jo.value("breathingRate", 1.2e-4);
+
+            // Support both formats:
+            // 1. Simple: { zoneId: N, scheduleId: M }
+            // 2. Frontend: { schedule: [{ startTime, endTime, zoneId }] }
+            if (jo.contains("schedule") && jo["schedule"].is_array() && !jo["schedule"].empty()) {
+                // Use first assignment's zoneId as initial zone
+                occ.currentZoneIdx = jo["schedule"][0].value("zoneId", 0);
+                occ.scheduleId = -1; // zone transitions handled by schedule array
+            } else {
+                occ.currentZoneIdx = jo.value("zoneId", 0);
+                occ.scheduleId = jo.value("scheduleId", -1);
+            }
+
+            model.occupants.push_back(occ);
         }
     }
 

@@ -4,6 +4,9 @@
 #include "core/Species.h"
 #include "core/Schedule.h"
 #include "core/TransientSimulation.h"
+#include "core/SimpleAHS.h"
+#include "core/Occupant.h"
+#include "io/WeatherReader.h"
 #include <string>
 #include <vector>
 #include <map>
@@ -18,6 +21,9 @@ struct ModelInput {
     std::map<int, int> zoneTemperatureSchedules;  // nodeIdx -> scheduleId
     TransientConfig transientConfig;
     bool hasTransient = false;
+    std::vector<WeatherRecord> weatherData;
+    std::vector<SimpleAHS> ahSystems;
+    std::vector<Occupant> occupants;
 };
 
 class JsonReader {

@@ -178,8 +178,10 @@ function App() {
             </div>
 
             {/* Floating BottomBar (z-20) */}
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20">
-              <BottomPanel />
+            <div className="absolute bottom-8 left-3 right-3 z-20 max-w-[900px] mx-auto">
+              <div className="rounded-xl border border-border shadow-xl overflow-hidden">
+                <BottomPanel />
+              </div>
             </div>
 
             {/* StatusBar at very bottom */}

@@ -152,6 +152,13 @@ export function canvasToTopology(): TopologyJson {
     topology.transient = appState.transientConfig;
   }
 
+  if (appState.weatherConfig.enabled) {
+    topology.weather = appState.weatherConfig;
+  }
+  if (appState.ahsSystems.length > 0) {
+    topology.ahsSystems = appState.ahsSystems;
+  }
+
   return topology;
 }
 

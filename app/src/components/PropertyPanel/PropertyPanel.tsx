@@ -9,6 +9,8 @@ import ScheduleEditor from '../ScheduleEditor/ScheduleEditor';
 import ScheduleGantt from '../ScheduleGantt/ScheduleGantt';
 import ControlPanel from '../ControlPanel/ControlPanel';
 import OccupantPanel from '../OccupantPanel/OccupantPanel';
+import WeatherPanel from '../WeatherPanel/WeatherPanel';
+import AHSPanel from '../AHSPanel/AHSPanel';
 import { ZoneProperties, EdgeProperties, PlacementProperties, StoryProperties } from './ZoneProperties';
 
 function InputField({ label, value, onChange, unit, type = 'text', step }: {
@@ -16,7 +18,7 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
+      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
       <div className="flex items-center gap-1">
         <input
           type={type}
@@ -25,7 +27,7 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
           onChange={(e) => onChange(e.target.value)}
           className="flex-1 px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring bg-background"
         />
-        {unit && <span className="text-[10px] text-slate-400 min-w-[24px]">{unit}</span>}
+        {unit && <span className="text-[10px] text-muted-foreground min-w-[24px]">{unit}</span>}
       </div>
     </label>
   );
@@ -126,7 +128,7 @@ function LinkProperties() {
 
       <div className="flex flex-col gap-2">
         <label className="flex flex-col gap-1">
-          <span className="text-[10px] font-semibold text-slate-500 tracking-wider">类型</span>
+          <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">类型</span>
           <select
             value={link.element.type}
             onChange={(e) => {
@@ -329,16 +331,16 @@ function LinkProperties() {
 
       {/* Schedule binding */}
       {['Fan', 'Damper', 'Filter', 'SelfRegulatingVent'].includes(link.element.type) && (
-        <div className="border-t border-slate-100 pt-2 mt-1">
+        <div className="border-t border-border pt-2 mt-1">
           <label className="flex flex-col gap-1">
-            <span className="text-[10px] font-semibold text-slate-500 tracking-wider">绑定排程</span>
+            <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">绑定排程</span>
             <select
               value={link.scheduleId ?? -1}
               onChange={(e) => {
                 const val = parseInt(e.target.value);
                 updateLink(link.id, { scheduleId: val === -1 ? undefined : val });
               }}
-              className="px-2 py-1.5 text-xs border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+              className="px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-background"
             >
               <option value={-1}>无排程（常开）</option>
               {useAppStore.getState().schedules.map((sch) => (
@@ -349,7 +351,7 @@ function LinkProperties() {
         </div>
       )}
 
-      <div className="mt-1 px-2 py-1.5 bg-slate-50 rounded text-[10px] text-slate-500">
+      <div className="mt-1 px-2 py-1.5 bg-muted rounded text-[10px] text-muted-foreground">
         ID: {link.id}
       </div>
     </div>
@@ -361,7 +363,7 @@ function AmbientSettings() {
 
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-sm font-bold text-slate-700">室外环境条件</span>
+      <span className="text-sm font-bold text-foreground">室外环境条件</span>
       <InputField
         label="温度" value={ambientTemperature} unit="K" type="number" step="0.1"
         onChange={(v) => setAmbient({ ambientTemperature: parseFloat(v) || 283.15 })}
@@ -389,7 +391,7 @@ export default function PropertyPanel() {
   const hasSelection = hasOldSelection || hasCanvasSelection;
 
   return (
-    <aside className="bg-card flex flex-col h-full overflow-hidden">
+    <aside className="bg-card flex flex-col h-full overflow-hidden pt-12">
       {hasSelection ? (
         <div className="flex flex-col h-full">
           <div className="px-4 py-2.5 border-b border-border">
@@ -405,13 +407,15 @@ export default function PropertyPanel() {
         </div>
       ) : (
         <Tabs defaultValue="model" className="flex flex-col h-full">
-          <div className="px-3 pt-2 border-b border-border shrink-0">
-            <TabsList className="w-full h-8">
-              <TabsTrigger value="model" className="flex-1 text-[11px] px-1">模型</TabsTrigger>
-              <TabsTrigger value="contam" className="flex-1 text-[11px] px-1">污染物</TabsTrigger>
-              <TabsTrigger value="schedule" className="flex-1 text-[11px] px-1">排程</TabsTrigger>
-              <TabsTrigger value="control" className="flex-1 text-[11px] px-1">控制</TabsTrigger>
-              <TabsTrigger value="occupant" className="flex-1 text-[11px] px-1">人员</TabsTrigger>
+          <div className="px-3 pt-2 pb-1 border-b border-border shrink-0">
+            <TabsList className="w-full h-auto flex-wrap gap-1 p-1">
+              <TabsTrigger value="model" className="text-[11px] px-2.5 py-1">模型</TabsTrigger>
+              <TabsTrigger value="contam" className="text-[11px] px-2.5 py-1">污染物</TabsTrigger>
+              <TabsTrigger value="schedule" className="text-[11px] px-2.5 py-1">排程</TabsTrigger>
+              <TabsTrigger value="control" className="text-[11px] px-2.5 py-1">控制</TabsTrigger>
+              <TabsTrigger value="occupant" className="text-[11px] px-2.5 py-1">人员</TabsTrigger>
+              <TabsTrigger value="weather" className="text-[11px] px-2.5 py-1">气象</TabsTrigger>
+              <TabsTrigger value="ahs" className="text-[11px] px-2.5 py-1">空调</TabsTrigger>
             </TabsList>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3">
@@ -436,6 +440,12 @@ export default function PropertyPanel() {
             </TabsContent>
             <TabsContent value="occupant" className="mt-0">
               <OccupantPanel />
+            </TabsContent>
+            <TabsContent value="weather" className="mt-0">
+              <WeatherPanel />
+            </TabsContent>
+            <TabsContent value="ahs" className="mt-0">
+              <AHSPanel />
             </TabsContent>
           </div>
         </Tabs>

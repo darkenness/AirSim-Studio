@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { useAppStore } from '../../store/useAppStore';
 import { faceArea } from '../../model/geometry';
@@ -9,13 +10,22 @@ import { faceArea } from '../../model/geometry';
 export function FloatingStatusBox() {
   const hoveredFaceId = useCanvasStore(s => s.hoveredFaceId);
   const hoveredEdgeId = useCanvasStore(s => s.hoveredEdgeId);
-  const cursorWorld = useCanvasStore(s => s.cursorWorld);
   const appMode = useCanvasStore(s => s.appMode);
   const story = useCanvasStore(s => s.getActiveStory());
   const result = useAppStore(s => s.result);
 
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      setMousePos({ x: e.clientX, y: e.clientY });
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   if (!hoveredFaceId && !hoveredEdgeId) return null;
-  if (!cursorWorld) return null;
+  if (!story) return null;
 
   const geo = story.geometry;
 
@@ -36,9 +46,11 @@ export function FloatingStatusBox() {
       <div className="pointer-events-none absolute inset-0 z-40">
         <div
           className="absolute bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-lg text-xs space-y-0.5 min-w-[140px]"
-          style={{ left: cursorWorld.x, top: cursorWorld.y, transform: 'translate(16px, -50%)' }}
-        >
-          <div className="font-semibold text-foreground">{zone.name}</div>
+          style={{
+            left: Math.min(mousePos.x, window.innerWidth - 200),
+            top: Math.max(60, Math.min(mousePos.y, window.innerHeight - 100)),
+            transform: 'translate(16px, -50%)',
+          }}
           <div className="text-muted-foreground">面积: {area.toFixed(2)} m²</div>
           <div className="text-muted-foreground">温度: {(zone.temperature - 273.15).toFixed(1)}°C</div>
           <div className="text-muted-foreground">体积: {zone.volume.toFixed(1)} m³</div>
@@ -71,10 +83,11 @@ export function FloatingStatusBox() {
       <div className="pointer-events-none absolute inset-0 z-40">
         <div
           className="absolute bg-card/95 backdrop-blur-md border border-border rounded-lg px-3 py-2 shadow-lg text-xs space-y-0.5 min-w-[120px]"
-          style={{ left: cursorWorld.x, top: cursorWorld.y, transform: 'translate(16px, -50%)' }}
-        >
-          <div className="font-semibold text-foreground">
-            {edge.isExterior ? '外墙' : '内墙'}
+          style={{
+            left: Math.min(mousePos.x, window.innerWidth - 200),
+            top: Math.max(60, Math.min(mousePos.y, window.innerHeight - 100)),
+            transform: 'translate(16px, -50%)',
+          }}
           </div>
           <div className="text-muted-foreground">长度: {length.toFixed(2)} m</div>
           {connectedZones.length === 2 && (

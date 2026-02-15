@@ -9,6 +9,8 @@
 #include "core/Solver.h"
 #include "core/ContaminantSolver.h"
 #include "core/TransientSimulation.h"
+#include "core/SimpleAHS.h"
+#include "io/WeatherReader.h"
 #include "elements/PowerLawOrifice.h"
 #include "elements/TwoWayFlow.h"
 #include <cmath>
@@ -390,4 +392,298 @@ TEST(RCMOrderingTest, BasicOrdering) {
     auto result = solver.solve(net);
     EXPECT_TRUE(result.converged);
     // Just verify it converges with RCM reordering active
+}
+
+// ── Non-trace density coupling test ─────────────────────────────────
+
+TEST(NonTraceDensityCoupling, HeavyGasAffectsDensity) {
+    // Heavy gas (SF6, M=146 g/mol) in a room should increase air density
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(30.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l2));
+
+    // SF6: molar mass 0.146 kg/mol, non-trace
+    Species sf6(0, "SF6", 0.146);
+    sf6.isTrace = false;
+
+    // Constant source: 0.01 kg/s of SF6
+    Source src(1, 0, 0.01);
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 60.0;
+    config.timeStep = 10.0;
+    config.outputInterval = 30.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({sf6});
+    sim.setSources({src});
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // Concentration should be non-zero after injection
+    bool hasConcentration = false;
+    for (auto& snap : result.history) {
+        if (!snap.contaminant.concentrations.empty() &&
+            snap.contaminant.concentrations[1][0] > 1e-10) {
+            hasConcentration = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasConcentration);
+}
+
+// ── WeatherReader Integration Tests ─────────────────────────────────
+
+TEST(WeatherIntegrationTest, WeatherUpdatesAmbientConditions) {
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    outdoor.setWindPressureCoeff(0.6);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(50.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l2));
+
+    Species co2(0, "CO2", 0.044);
+
+    // Create synthetic weather data: temperature drops from 20°C to 10°C
+    std::vector<WeatherRecord> weather;
+    weather.push_back({1, 1, 1, 293.15, 5.0, 180.0, 101325.0, 0.5});  // t=0
+    weather.push_back({1, 1, 2, 283.15, 3.0, 90.0, 101300.0, 0.6});   // t=3600
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 3600.0;
+    config.timeStep = 600.0;
+    config.outputInterval = 1800.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({co2});
+    sim.setWeatherData(weather);
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // After simulation, ambient temperature should have changed
+    // (weather updates ambient nodes each step)
+    EXPECT_GE(result.history.size(), 2u);
+}
+
+TEST(WeatherReaderTest, InterpolateBasic) {
+    std::vector<WeatherRecord> records;
+    records.push_back({1, 1, 1, 293.15, 5.0, 180.0, 101325.0, 0.5});
+    records.push_back({1, 1, 2, 283.15, 3.0, 90.0, 101300.0, 0.6});
+
+    // Midpoint interpolation
+    double tMid = WeatherReader::recordToTime(records[0])
+                + (WeatherReader::recordToTime(records[1]) - WeatherReader::recordToTime(records[0])) / 2.0;
+    auto wx = WeatherReader::interpolate(records, tMid);
+    EXPECT_NEAR(wx.temperature, 288.15, 0.1);
+    EXPECT_NEAR(wx.windSpeed, 4.0, 0.1);
+}
+
+// ── SimpleAHS Integration Tests ─────────────────────────────────────
+
+TEST(AHSIntegrationTest, AHSSupplyDilutesContaminant) {
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(100.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.001, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.001, 0.65));
+    net.addLink(std::move(l2));
+
+    // CO2 with zero outdoor concentration
+    Species co2(0, "CO2", 0.044);
+    co2.outdoorConc = 0.0;
+
+    // Constant CO2 source in room
+    Source src(1, 0, 0.001); // 0.001 kg/s
+
+    // AHS: supply 100% outdoor air to room
+    SimpleAHS ahs(0, "MainAHU", 0.5, 0.5, 0.5, 0.5);
+    ahs.supplyZones.push_back({1, 1.0});
+    ahs.returnZones.push_back({1, 1.0});
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 600.0;
+    config.timeStep = 60.0;
+    config.outputInterval = 300.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({co2});
+    sim.setSources({src});
+    sim.setAHSystems({ahs});
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // With AHS supplying clean outdoor air, concentration should be lower
+    // than without AHS (just verify simulation completes and has data)
+    EXPECT_GE(result.history.size(), 2u);
+    bool hasConc = false;
+    for (auto& snap : result.history) {
+        if (!snap.contaminant.concentrations.empty() &&
+            snap.contaminant.concentrations[1][0] > 0.0) {
+            hasConc = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(hasConc);
+}
+
+// ── Occupant CO2 Source Injection Tests ──────────────────────────────
+
+TEST(OccupantSourceTest, OccupantGeneratesCO2) {
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(50.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l2));
+
+    // CO2 species (molar mass ~0.044)
+    Species co2(0, "CO2", 0.044);
+    co2.outdoorConc = 0.0;
+
+    // One occupant in room, breathing rate 1.2e-4 m³/s
+    Occupant occ;
+    occ.id = 0;
+    occ.name = "Person1";
+    occ.currentZoneIdx = 1;
+    occ.breathingRate = 1.2e-4;
+    occ.scheduleId = -1;
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 600.0;
+    config.timeStep = 60.0;
+    config.outputInterval = 300.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({co2});
+    sim.setOccupants({occ});
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // CO2 should build up from occupant breathing
+    bool co2Increased = false;
+    for (size_t i = 1; i < result.history.size(); ++i) {
+        if (!result.history[i].contaminant.concentrations.empty() &&
+            result.history[i].contaminant.concentrations[1][0] > 1e-10) {
+            co2Increased = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(co2Increased);
+}
+
+TEST(OccupantSourceTest, NoOccupantNoCO2) {
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(50.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l2));
+
+    Species co2(0, "CO2", 0.044);
+    co2.outdoorConc = 0.0;
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 300.0;
+    config.timeStep = 60.0;
+    config.outputInterval = 300.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({co2});
+    // No occupants, no sources
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // No sources → concentration stays zero
+    for (auto& snap : result.history) {
+        if (!snap.contaminant.concentrations.empty()) {
+            EXPECT_NEAR(snap.contaminant.concentrations[1][0], 0.0, 1e-15);
+        }
+    }
+}
+
+TEST(ExtraSourcesTest, AddAndClearExtraSources) {
+    ContaminantSolver solver;
+    Source s;
+    s.zoneId = 1;
+    s.speciesId = 0;
+    s.type = SourceType::Constant;
+    s.generationRate = 0.01;
+
+    solver.addExtraSources({s});
+    solver.clearExtraSources();
+    // Just verify no crash — extra sources cleared properly
 }

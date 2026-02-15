@@ -63,6 +63,9 @@ ContaminantResult ContaminantSolver::step(const Network& network, double t, doub
         }
     }
 
+    // Clear per-timestep extra sources
+    extraSources_.clear();
+
     return {t + dt, C_};
 }
 
@@ -189,12 +192,35 @@ void ContaminantSolver::solveSpecies(const Network& network, int specIdx, double
             if (C_[zoneIdx][specIdx] < src.cutoffConc) {
                 b(eq) += src.generationRate * scheduleMult;
             }
+        } else if (src.type == SourceType::Burst) {
+            // G = burstMass / burstDuration when t ∈ [burstTime, burstTime+burstDuration]
+            double tEval = t + dt;
+            if (tEval >= src.burstTime && tEval <= src.burstTime + src.burstDuration) {
+                double burstRate = src.burstMass / src.burstDuration;
+                b(eq) += burstRate * scheduleMult;
+            }
         } else {
             // Constant source: G * schedule → RHS
             b(eq) += src.generationRate * scheduleMult;
         }
 
         // Removal sink: -R * C * V → A += R * V (implicit)
+        if (src.removalRate > 0.0) {
+            double Vi = network.getNode(zoneIdx).getVolume();
+            A(eq, eq) += src.removalRate * Vi;
+        }
+    }
+
+    // Extra sources (AHS, occupants — injected per-timestep)
+    for (const auto& src : extraSources_) {
+        if (src.speciesId != specIdx) continue; // speciesId = species index for extra sources
+        int zoneIdx = src.zoneId; // extraSources use direct zone index
+        if (zoneIdx < 0 || zoneIdx >= numZones_) continue;
+        int eq = unknownMap[zoneIdx];
+        if (eq < 0) continue;
+
+        b(eq) += src.generationRate;
+
         if (src.removalRate > 0.0) {
             double Vi = network.getNode(zoneIdx).getVolume();
             A(eq, eq) += src.removalRate * Vi;
@@ -323,9 +349,33 @@ void ContaminantSolver::solveCoupled(const Network& network, double t, double dt
                 b(row) += src.multiplier * src.generationRate
                           * std::exp(-elapsed / src.decayTimeConstant) * scheduleMult;
             }
+        } else if (src.type == SourceType::Burst) {
+            double tEval = t + dt;
+            if (tEval >= src.burstTime && tEval <= src.burstTime + src.burstDuration) {
+                double burstRate = src.burstMass / src.burstDuration;
+                b(row) += burstRate * scheduleMult;
+            }
         } else {
             b(row) += src.generationRate * scheduleMult;
         }
+
+        if (src.removalRate > 0.0) {
+            double Vi = network.getNode(zoneIdx).getVolume();
+            A(row, row) += src.removalRate * Vi;
+        }
+    }
+
+    // Extra sources (AHS, occupants — injected per-timestep)
+    for (const auto& src : extraSources_) {
+        int specIdx = src.speciesId; // extraSources use direct species index
+        if (specIdx < 0 || specIdx >= numSpecies_) continue;
+        int zoneIdx = src.zoneId; // direct zone index
+        if (zoneIdx < 0 || zoneIdx >= numZones_) continue;
+        int eq = unknownMap[zoneIdx];
+        if (eq < 0) continue;
+
+        int row = idx(eq, specIdx);
+        b(row) += src.generationRate;
 
         if (src.removalRate > 0.0) {
             double Vi = network.getNode(zoneIdx).getVolume();

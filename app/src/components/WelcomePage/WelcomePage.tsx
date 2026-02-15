@@ -1,7 +1,7 @@
 import { useAppStore } from '../../store/useAppStore';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { PenLine, FolderOpen, BookOpen, DoorOpen } from 'lucide-react';
-import { useRef } from 'react';
+import { openFile } from '../../utils/fileOps';
 
 interface WelcomePageProps {
   onStart?: () => void;
@@ -10,25 +10,19 @@ interface WelcomePageProps {
 export default function WelcomePage({ onStart }: WelcomePageProps) {
   const { loadFromJson, setError } = useAppStore();
   const setToolMode = useCanvasStore(s => s.setToolMode);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleOpen = () => fileInputRef.current?.click();
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      try {
-        const json = JSON.parse(ev.target?.result as string);
-        loadFromJson(json);
-        onStart?.();
-      } catch (err) {
-        setError(`文件解析失败: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+  const handleOpen = async () => {
+    const result = await openFile([
+      { name: 'CONTAM JSON', extensions: ['contam.json', 'json'] },
+    ]);
+    if (!result) return;
+    try {
+      const json = JSON.parse(result.content);
+      loadFromJson(json);
+      onStart?.();
+    } catch (err) {
+      setError(`文件解析失败: ${err instanceof Error ? err.message : String(err)}`);
+    }
   };
 
   const handleNewProject = () => {
@@ -119,7 +113,6 @@ export default function WelcomePage({ onStart }: WelcomePageProps) {
           </div>
         </div>
 
-        <input ref={fileInputRef} type="file" accept=".json,.contam.json" onChange={handleFileChange} className="hidden" />
       </div>
     </div>
   );

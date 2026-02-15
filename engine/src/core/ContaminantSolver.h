@@ -48,9 +48,16 @@ public:
     // Set initial concentration for a specific zone and species
     void setInitialConcentration(int nodeIdx, int speciesIdx, double conc);
 
+    // Add extra sources for current timestep (cleared after each step)
+    void addExtraSources(const std::vector<Source>& extra) {
+        extraSources_.insert(extraSources_.end(), extra.begin(), extra.end());
+    }
+    void clearExtraSources() { extraSources_.clear(); }
+
 private:
     std::vector<Species> species_;
     std::vector<Source> sources_;
+    std::vector<Source> extraSources_;  // transient per-step sources (AHS, occupants)
     std::map<int, Schedule> schedules_;
 
     // C_[nodeIdx][speciesIdx] = concentration in kg/m³

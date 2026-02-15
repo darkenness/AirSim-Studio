@@ -4,6 +4,8 @@
 #include "elements/Duct.h"
 #include "elements/Damper.h"
 #include "elements/Filter.h"
+#include "elements/SimpleGaseousFilter.h"
+#include "elements/UVGIFilter.h"
 #include "elements/PowerLawOrifice.h"
 #include "core/Network.h"
 #include "core/Solver.h"
@@ -557,4 +559,224 @@ TEST(FilterIntegrationTest, FilterInNetwork) {
     Solver solver;
     auto result = solver.solve(net);
     EXPECT_TRUE(result.converged);
+}
+
+// ── SimpleGaseousFilter Tests ───────────────────────────────────────
+
+TEST(SimpleGaseousFilterTest, BasicEfficiency) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {1.0, 0.80}, {5.0, 0.30}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table, 0.05);
+
+    EXPECT_NEAR(sgf.getEfficiency(0, 0.0), 0.95, 1e-10);
+    EXPECT_NEAR(sgf.getEfficiency(0, 10.0), 0.02, 1e-10);
+}
+
+TEST(SimpleGaseousFilterTest, SplineInterpolation) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {1.0, 0.80}, {5.0, 0.30}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table, 0.05);
+
+    double eff = sgf.getEfficiency(0, 3.0);
+    EXPECT_GT(eff, 0.30);
+    EXPECT_LT(eff, 0.80);
+}
+
+TEST(SimpleGaseousFilterTest, LoadingAccumulation) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {5.0, 0.50}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table, 0.05);
+
+    EXPECT_DOUBLE_EQ(sgf.getCurrentLoading(), 0.0);
+    sgf.addLoading(3.0);
+    EXPECT_DOUBLE_EQ(sgf.getCurrentLoading(), 3.0);
+    sgf.addLoading(2.0);
+    EXPECT_DOUBLE_EQ(sgf.getCurrentLoading(), 5.0);
+    EXPECT_NEAR(sgf.getEfficiency(), 0.50, 1e-10);
+}
+
+TEST(SimpleGaseousFilterTest, Breakthrough) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {5.0, 0.50}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table, 0.05);
+
+    EXPECT_FALSE(sgf.isBreakthrough());
+    sgf.addLoading(10.0);
+    EXPECT_TRUE(sgf.isBreakthrough());
+}
+
+TEST(SimpleGaseousFilterTest, FlowMatchesPowerLaw) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table);
+    PowerLawOrifice plo(0.001, 0.65);
+
+    auto rf = sgf.calculate(10.0, 1.2);
+    auto rp = plo.calculate(10.0, 1.2);
+    EXPECT_NEAR(rf.massFlow, rp.massFlow, 1e-10);
+}
+
+TEST(SimpleGaseousFilterTest, NegativePressure) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table);
+    auto result = sgf.calculate(-10.0, 1.2);
+    EXPECT_LT(result.massFlow, 0.0);
+}
+
+TEST(SimpleGaseousFilterTest, InvalidParameters) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {10.0, 0.02}
+    };
+    EXPECT_THROW(SimpleGaseousFilter(0.0, 0.65, table), std::invalid_argument);
+    EXPECT_THROW(SimpleGaseousFilter(0.001, 0.3, table), std::invalid_argument);
+
+    std::vector<SimpleGaseousFilter::LoadingPoint> small = {{0.0, 0.95}};
+    EXPECT_THROW(SimpleGaseousFilter(0.001, 0.65, small), std::invalid_argument);
+}
+
+TEST(SimpleGaseousFilterTest, Clone) {
+    std::vector<SimpleGaseousFilter::LoadingPoint> table = {
+        {0.0, 0.95}, {5.0, 0.50}, {10.0, 0.02}
+    };
+    SimpleGaseousFilter sgf(0.001, 0.65, table);
+    sgf.addLoading(3.0);
+    auto cloned = sgf.clone();
+    auto r1 = sgf.calculate(10.0, 1.2);
+    auto r2 = cloned->calculate(10.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
+}
+
+// ── UVGIFilter Tests ────────────────────────────────────────────────
+
+TEST(UVGIFilterTest, BasicSurvival) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;            // m²/J
+    params.irradiance = 40.0;   // W/m²
+    params.chamberVolume = 0.01; // m³
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+
+    // At Q=0.01 m³/s: t_res = 0.01/0.01 = 1s
+    // S = exp(-0.05 * 40 * 1) = exp(-2) ≈ 0.1353
+    double S = uvgi.getSurvivalFraction(0.01, 293.15);
+    EXPECT_NEAR(S, std::exp(-2.0), 1e-6);
+}
+
+TEST(UVGIFilterTest, HigherFlowLessDose) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+
+    double S_slow = uvgi.getSurvivalFraction(0.005, 293.15);  // t_res=2s
+    double S_fast = uvgi.getSurvivalFraction(0.02, 293.15);   // t_res=0.5s
+
+    // Slower flow = more UV dose = lower survival
+    EXPECT_LT(S_slow, S_fast);
+}
+
+TEST(UVGIFilterTest, Efficiency) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+
+    double eff = uvgi.getEfficiency(0.01, 293.15);
+    EXPECT_NEAR(eff, 1.0 - std::exp(-2.0), 1e-6);
+    EXPECT_GT(eff, 0.0);
+    EXPECT_LT(eff, 1.0);
+}
+
+TEST(UVGIFilterTest, LampAging) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+    params.agingRate = 0.0001;  // 0.01%/hr
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+
+    double S_new = uvgi.getSurvivalFraction(0.01, 293.15, 0.0);
+    double S_old = uvgi.getSurvivalFraction(0.01, 293.15, 5000.0);
+
+    // Aged lamp = less effective = higher survival
+    EXPECT_GT(S_old, S_new);
+}
+
+TEST(UVGIFilterTest, LampAgeSetter) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+    params.agingRate = 0.0001;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+    EXPECT_DOUBLE_EQ(uvgi.getLampAge(), 0.0);
+
+    uvgi.setLampAge(1000.0);
+    EXPECT_DOUBLE_EQ(uvgi.getLampAge(), 1000.0);
+}
+
+TEST(UVGIFilterTest, ZeroFlowNoInactivation) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+
+    double S = uvgi.getSurvivalFraction(0.0, 293.15);
+    EXPECT_DOUBLE_EQ(S, 1.0);
+}
+
+TEST(UVGIFilterTest, FlowMatchesPowerLaw) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+    PowerLawOrifice plo(0.001, 0.65);
+
+    auto ru = uvgi.calculate(10.0, 1.2);
+    auto rp = plo.calculate(10.0, 1.2);
+    EXPECT_NEAR(ru.massFlow, rp.massFlow, 1e-10);
+}
+
+TEST(UVGIFilterTest, InvalidParameters) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    EXPECT_THROW(UVGIFilter(0.0, 0.65, params), std::invalid_argument);
+    EXPECT_THROW(UVGIFilter(0.001, 0.3, params), std::invalid_argument);
+
+    UVGIFilter::UVGIParams badParams;
+    badParams.chamberVolume = 0.0;
+    EXPECT_THROW(UVGIFilter(0.001, 0.65, badParams), std::invalid_argument);
+}
+
+TEST(UVGIFilterTest, Clone) {
+    UVGIFilter::UVGIParams params;
+    params.k = 0.05;
+    params.irradiance = 40.0;
+    params.chamberVolume = 0.01;
+
+    UVGIFilter uvgi(0.001, 0.65, params);
+    auto cloned = uvgi.clone();
+    auto r1 = uvgi.calculate(10.0, 1.2);
+    auto r2 = cloned->calculate(10.0, 1.2);
+    EXPECT_DOUBLE_EQ(r1.massFlow, r2.massFlow);
 }

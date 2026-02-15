@@ -30,7 +30,7 @@ function InputField({ label, value, onChange, unit, type = 'text', step }: {
           onChange={(e) => onChange(e.target.value)}
           className="flex-1 px-2 py-1.5 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring bg-background"
         />
-        {unit && <span className="text-[10px] text-slate-400 min-w-[24px]">{unit}</span>}
+        {unit && <span className="text-[10px] text-muted-foreground min-w-[24px]">{unit}</span>}
       </div>
     </label>
   );
@@ -42,6 +42,7 @@ export function ZoneProperties() {
   const updateZone = useCanvasStore(s => s.updateZone);
 
   if (!selectedFaceId) return null;
+  if (!story) return null;
 
   const geo = story.geometry;
   const face = geo.faces.find(f => f.id === selectedFaceId);
@@ -99,6 +100,7 @@ export function EdgeProperties() {
   const selectPlacement = useCanvasStore(s => s.selectPlacement);
 
   if (!selectedEdgeId) return null;
+  if (!story) return null;
 
   const geo = story.geometry;
   const edge = geo.edges.find(e => e.id === selectedEdgeId);
@@ -195,6 +197,7 @@ export function PlacementProperties() {
   const removePlacement = useCanvasStore(s => s.removePlacement);
 
   if (!selectedPlacementId) return null;
+  if (!story) return null;
 
   const placement = story.placements.find(p => p.id === selectedPlacementId);
   if (!placement) return null;
@@ -422,6 +425,8 @@ export function PlacementProperties() {
 export function StoryProperties() {
   const story = useCanvasStore(s => s.getActiveStory());
   const updateStoryHeight = useCanvasStore(s => s.updateStoryHeight);
+
+  if (!story) return null;
 
   return (
     <div className="flex flex-col gap-3">

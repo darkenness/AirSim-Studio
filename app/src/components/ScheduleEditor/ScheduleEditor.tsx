@@ -87,8 +87,8 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
   };
 
   return (
-    <div className="border border-slate-100 rounded-md bg-white">
-      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-slate-50">
+    <div className="border border-border rounded-md bg-card">
+      <div className="flex items-center gap-1 px-2 py-1.5 border-b border-border/50">
         <Clock size={12} className="text-teal-500" />
         {editingName ? (
           <input
@@ -97,18 +97,18 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
             onBlur={() => setEditingName(false)}
             onKeyDown={(e) => e.key === 'Enter' && setEditingName(false)}
             autoFocus
-            className="flex-1 px-1 py-0 text-xs border border-blue-300 rounded focus:outline-none"
+            className="flex-1 px-1 py-0 text-xs border border-ring rounded focus:outline-none bg-background text-foreground"
           />
         ) : (
           <span
-            className="flex-1 text-xs font-bold text-slate-700 cursor-pointer hover:text-blue-600"
+            className="flex-1 text-xs font-bold text-foreground cursor-pointer hover:text-primary"
             onClick={() => setEditingName(true)}
           >
             {schedule.name || `时间表 #${schedule.id}`}
           </span>
         )}
-        <span className="text-[9px] text-slate-400">#{schedule.id}</span>
-        <button onClick={onDelete} className="p-0.5 hover:bg-red-50 rounded text-slate-400 hover:text-red-500">
+        <span className="text-[9px] text-muted-foreground">#{schedule.id}</span>
+        <button onClick={onDelete} className="p-0.5 hover:bg-destructive/10 rounded text-muted-foreground hover:text-destructive">
           <Trash2 size={11} />
         </button>
       </div>
@@ -118,7 +118,7 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
       <div className="px-2 py-1 flex flex-wrap gap-1">
         {PRESETS.map((p) => (
           <button key={p.name} onClick={() => applyPreset(p)}
-            className="px-1.5 py-0.5 text-[9px] bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 rounded border border-slate-100">
+            className="px-1.5 py-0.5 text-[9px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border">
             <Copy size={8} className="inline mr-0.5" />{p.name}
           </button>
         ))}
@@ -127,7 +127,7 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
       <div className="px-2 pb-2">
         <table className="w-full text-[10px]">
           <thead>
-            <tr className="text-slate-400">
+            <tr className="text-muted-foreground">
               <th className="text-left font-semibold py-0.5">时间 (s)</th>
               <th className="text-left font-semibold py-0.5">值</th>
               <th className="w-5"></th>
@@ -135,19 +135,19 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
           </thead>
           <tbody>
             {schedule.points.map((pt, idx) => (
-              <tr key={idx} className="border-t border-slate-50">
+              <tr key={idx} className="border-t border-border/50">
                 <td className="py-0.5 pr-1">
                   <input type="number" value={pt.time} step="60"
                     onChange={(e) => updatePoint(idx, 'time', parseFloat(e.target.value) || 0)}
-                    className="w-full px-1 py-0.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                    className="w-full px-1 py-0.5 text-[10px] border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 </td>
                 <td className="py-0.5 pr-1">
                   <input type="number" value={pt.value} step="0.1" min="0" max="10"
                     onChange={(e) => updatePoint(idx, 'value', parseFloat(e.target.value) || 0)}
-                    className="w-full px-1 py-0.5 text-[10px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-blue-300" />
+                    className="w-full px-1 py-0.5 text-[10px] border border-border rounded bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring" />
                 </td>
                 <td>
-                  <button onClick={() => removePoint(idx)} className="p-0.5 text-slate-300 hover:text-red-400">
+                  <button onClick={() => removePoint(idx)} className="p-0.5 text-muted-foreground hover:text-destructive">
                     <Trash2 size={10} />
                   </button>
                 </td>
@@ -156,7 +156,7 @@ function SingleScheduleEditor({ schedule, onUpdate, onDelete }: {
           </tbody>
         </table>
         <button onClick={addPoint}
-          className="mt-1 flex items-center gap-0.5 text-[10px] text-slate-400 hover:text-blue-500">
+          className="mt-1 flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-primary">
           <Plus size={10} /> 添加时间点
         </button>
       </div>
@@ -191,14 +191,14 @@ export default function ScheduleEditor() {
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2">
         <Clock size={14} className="text-teal-500" />
-        <span className="text-xs font-bold text-slate-700">时间表</span>
-        <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-teal-50 text-slate-400 hover:text-teal-500">
+        <span className="text-xs font-bold text-foreground">时间表</span>
+        <button onClick={handleAdd} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground hover:text-teal-500">
           <Plus size={14} />
         </button>
       </div>
 
       {schedules.length === 0 && (
-        <p className="text-[10px] text-slate-400 italic">尚未添加时间表。点击 + 添加。</p>
+        <p className="text-[10px] text-muted-foreground italic">尚未添加时间表。点击 + 添加。</p>
       )}
 
       {schedules.map((sch) => (

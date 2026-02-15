@@ -49,6 +49,11 @@ TransientResult TransientSimulation::run(Network& network) {
             updateZoneTemperatures(network, t + currentDt);
         }
 
+        // Step 0b: Update weather-driven boundary conditions
+        if (!weatherData_.empty()) {
+            updateWeatherConditions(network, t + currentDt);
+        }
+
         // Step 1: Update control system (read sensors -> run controllers -> apply actuators)
         if (!controllers_.empty()) {
             updateSensors(network, contSolver);
@@ -66,14 +71,56 @@ TransientResult TransientSimulation::run(Network& network) {
         // Step 3: Solve contaminant transport
         ContaminantResult contResult = {t + currentDt, {}};
         if (hasContaminants) {
+            // Step 2b: Apply AHS flows to contaminant solver
+            if (!ahSystems_.empty()) {
+                applyAHSFlows(network, contSolver, t + currentDt);
+            }
+
+            // Step 2c: Inject occupant CO2 sources
+            if (!occupants_.empty()) {
+                std::vector<Source> occSources;
+                injectOccupantSources(occSources, t + currentDt);
+                if (!occSources.empty()) {
+                    contSolver.addExtraSources(occSources);
+                }
+            }
+
             contResult = contSolver.step(network, t, currentDt);
 
             // Step 3b: Non-trace density feedback coupling
-            // If non-trace species exist, update densities and re-solve airflow
+            // If non-trace species exist, iterate density-airflow until convergence
             if (hasNonTraceSpecies()) {
-                updateDensitiesFromConcentrations(network, contSolver);
-                auto airResult2 = airflowSolver.solve(network);
-                if (airResult2.converged) airResult = airResult2;
+                constexpr int MAX_COUPLING_ITER = 5;
+                constexpr double DENSITY_TOL = 1e-4; // relative tolerance
+
+                for (int iter = 0; iter < MAX_COUPLING_ITER; ++iter) {
+                    // Save current densities
+                    std::vector<double> prevDensities(network.getNodeCount());
+                    for (int i = 0; i < network.getNodeCount(); ++i) {
+                        prevDensities[i] = network.getNode(i).getDensity();
+                    }
+
+                    // Update densities from concentrations
+                    updateDensitiesFromConcentrations(network, contSolver);
+
+                    // Check convergence
+                    double maxRelChange = 0.0;
+                    for (int i = 0; i < network.getNodeCount(); ++i) {
+                        if (network.getNode(i).isKnownPressure()) continue;
+                        double rhoOld = prevDensities[i];
+                        double rhoNew = network.getNode(i).getDensity();
+                        if (rhoOld > 0.0) {
+                            double relChange = std::abs(rhoNew - rhoOld) / rhoOld;
+                            maxRelChange = std::max(maxRelChange, relChange);
+                        }
+                    }
+
+                    // Re-solve airflow with updated densities
+                    auto airResult2 = airflowSolver.solve(network);
+                    if (airResult2.converged) airResult = airResult2;
+
+                    if (maxRelChange < DENSITY_TOL) break;
+                }
             }
         }
 
@@ -255,11 +302,144 @@ void TransientSimulation::updateOccupantExposure(
 void TransientSimulation::injectOccupantSources(
     std::vector<Source>& dynamicSources, double /*t*/)
 {
-    // Occupants as mobile pollution sources
-    // Each occupant can emit CO2 (or other species) in their current zone
-    // This is handled by the user adding sources with matching zone IDs
-    // Future: auto-generate sources based on occupant breathing rate and zone
-    (void)dynamicSources; // placeholder for future implementation
+    // Generate CO2 sources from occupants based on breathing rate
+    // Standard CO2 generation: breathingRate * CO2_fraction_exhaled
+    // Typical exhaled CO2 fraction ~0.04 (4%)
+    constexpr double CO2_EXHALED_FRACTION = 0.04;
+    constexpr double AIR_DENSITY = 1.2; // kg/m³ approximate
+
+    // Find CO2 species index (by name or molar mass ~0.044 kg/mol)
+    int co2Idx = -1;
+    for (int k = 0; k < (int)species_.size(); ++k) {
+        if (species_[k].name == "CO2" || species_[k].name == "co2" ||
+            (std::abs(species_[k].molarMass - 0.044) < 0.001)) {
+            co2Idx = k;
+            break;
+        }
+    }
+    if (co2Idx < 0) return; // No CO2 species defined
+
+    for (const auto& occ : occupants_) {
+        if (occ.currentZoneIdx < 0) continue;
+
+        Source src;
+        src.zoneId = occ.currentZoneIdx;
+        src.speciesId = co2Idx;
+        src.type = SourceType::Constant;
+        // Generation rate: breathingRate (m³/s) * airDensity (kg/m³) * CO2 fraction
+        src.generationRate = occ.breathingRate * AIR_DENSITY * CO2_EXHALED_FRACTION;
+        src.removalRate = 0.0;
+        src.scheduleId = -1;
+        dynamicSources.push_back(src);
+    }
+}
+
+void TransientSimulation::updateWeatherConditions(Network& network, double t) {
+    WeatherRecord wx = WeatherReader::interpolate(weatherData_, t);
+
+    // Update network ambient conditions
+    network.setWindSpeed(wx.windSpeed);
+    network.setWindDirection(wx.windDirection);
+    network.setAmbientTemperature(wx.temperature);
+    network.setAmbientPressure(wx.pressure);
+
+    // Update ambient nodes: temperature, density, and wind pressures
+    for (int i = 0; i < network.getNodeCount(); ++i) {
+        auto& node = network.getNode(i);
+        if (!node.isKnownPressure()) continue; // only ambient nodes
+
+        node.setTemperature(wx.temperature);
+        node.updateDensity();
+    }
+}
+
+void TransientSimulation::applyAHSFlows(Network& network, ContaminantSolver& contSolver, double t) {
+    // For each AHS, inject supply/return mass flows as additional sources/sinks
+    // in the contaminant transport equation.
+    // Supply air = mix of outdoor air + recirculated return air
+    // This modifies the effective source terms for each connected zone.
+
+    const auto& conc = contSolver.getConcentrations();
+    int numSpecies = (int)species_.size();
+
+    for (const auto& ahs : ahSystems_) {
+        // Get schedule-modulated flow rates
+        double supplyQ = ahs.supplyFlow;
+        if (ahs.supplyFlowScheduleId >= 0) {
+            auto it = schedules_.find(ahs.supplyFlowScheduleId);
+            if (it != schedules_.end()) {
+                supplyQ *= it->second.getValue(t);
+            }
+        }
+
+        double oaFraction = ahs.getOutdoorAirFraction();
+        if (ahs.outdoorAirScheduleId >= 0) {
+            auto it = schedules_.find(ahs.outdoorAirScheduleId);
+            if (it != schedules_.end()) {
+                oaFraction = it->second.getValue(t);
+            }
+        }
+
+        // Compute mixed return air concentration (weighted average of return zones)
+        std::vector<double> returnConc(numSpecies, 0.0);
+        double totalReturnFrac = 0.0;
+        for (const auto& rz : ahs.returnZones) {
+            int zIdx = rz.zoneId;
+            if (zIdx >= 0 && zIdx < (int)conc.size()) {
+                for (int k = 0; k < numSpecies && k < (int)conc[zIdx].size(); ++k) {
+                    returnConc[k] += rz.fraction * conc[zIdx][k];
+                }
+                totalReturnFrac += rz.fraction;
+            }
+        }
+        if (totalReturnFrac > 0.0) {
+            for (int k = 0; k < numSpecies; ++k) {
+                returnConc[k] /= totalReturnFrac;
+            }
+        }
+
+        // Supply air concentration = OA_fraction * outdoor + (1 - OA_fraction) * return
+        std::vector<double> supplyConc(numSpecies, 0.0);
+        for (int k = 0; k < numSpecies; ++k) {
+            double outdoorC = species_[k].outdoorConc;
+            supplyConc[k] = oaFraction * outdoorC + (1.0 - oaFraction) * returnConc[k];
+        }
+
+        // Inject supply air as additional sources into supply zones
+        // Each supply zone gets: supplyQ * fraction * density * supplyConc[k]
+        // and loses: returnQ * fraction * density * zoneConc[k] (via return)
+        // These are handled as extra source terms added to the contaminant solver
+        double rho = 1.2; // approximate air density for volume→mass conversion
+
+        std::vector<Source> ahsSources;
+        for (const auto& sz : ahs.supplyZones) {
+            int zIdx = sz.zoneId;
+            if (zIdx < 0) continue;
+
+            for (int k = 0; k < numSpecies; ++k) {
+                Source src;
+                src.zoneId = zIdx;
+                src.speciesId = k;
+                src.type = SourceType::Constant;
+                // Supply injects contaminant: Q_supply * frac * rho * C_supply
+                src.generationRate = supplyQ * sz.fraction * rho * supplyConc[k];
+                // Return removes contaminant proportional to zone concentration
+                // This is modeled as a removal rate coefficient: Q_return * frac * rho / V
+                // But since the solver already handles outflow, we only add the supply injection
+                src.removalRate = 0.0;
+                src.scheduleId = -1;
+
+                if (src.generationRate > 0.0) {
+                    ahsSources.push_back(src);
+                }
+            }
+        }
+
+        // Add AHS sources to the solver for this timestep
+        if (!ahsSources.empty()) {
+            contSolver.addExtraSources(ahsSources);
+        }
+    }
 }
 
 void TransientSimulation::updateZoneTemperatures(Network& network, double t) {

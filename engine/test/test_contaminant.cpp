@@ -281,3 +281,82 @@ TEST_F(ContaminantTest, TransientWithSchedule) {
         EXPECT_NEAR(result.history[0].contaminant.concentrations[1][0], 0.0, 1e-15);
     }
 }
+
+// ── BurstSource Tests ───────────────────────────────────────────────
+
+TEST(BurstSourceTest, FactoryMethod) {
+    Source s = Source::makeBurst(1, 0, 0.5, 10.0, 5.0);
+    EXPECT_EQ(s.type, SourceType::Burst);
+    EXPECT_EQ(s.zoneId, 1);
+    EXPECT_EQ(s.speciesId, 0);
+    EXPECT_DOUBLE_EQ(s.burstMass, 0.5);
+    EXPECT_DOUBLE_EQ(s.burstTime, 10.0);
+    EXPECT_DOUBLE_EQ(s.burstDuration, 5.0);
+}
+
+TEST(BurstSourceTest, ZeroDurationDefaultsToOne) {
+    Source s = Source::makeBurst(1, 0, 0.5, 10.0, 0.0);
+    EXPECT_DOUBLE_EQ(s.burstDuration, 1.0);
+}
+
+TEST(BurstSourceTest, BurstInTransient) {
+    Network net;
+    Node outdoor(0, "Outdoor", NodeType::Ambient);
+    outdoor.setTemperature(293.15);
+    net.addNode(outdoor);
+
+    Node room(1, "Room");
+    room.setTemperature(293.15);
+    room.setVolume(50.0);
+    net.addNode(room);
+
+    Link l1(1, 0, 1, 1.0);
+    l1.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l1));
+
+    Link l2(2, 1, 0, 1.0);
+    l2.setFlowElement(std::make_unique<PowerLawOrifice>(0.002, 0.65));
+    net.addLink(std::move(l2));
+
+    Species gas(0, "Gas", 0.029);
+    // Burst: 0.1 kg released over 60s starting at t=60s
+    Source burst = Source::makeBurst(1, 0, 0.1, 60.0, 60.0);
+
+    TransientConfig config;
+    config.startTime = 0.0;
+    config.endTime = 300.0;
+    config.timeStep = 30.0;
+    config.outputInterval = 60.0;
+
+    TransientSimulation sim;
+    sim.setConfig(config);
+    sim.setSpecies({gas});
+    sim.setSources({burst});
+
+    auto result = sim.run(net);
+    EXPECT_TRUE(result.completed);
+
+    // Before burst (t=0): concentration should be 0
+    EXPECT_NEAR(result.history[0].contaminant.concentrations[1][0], 0.0, 1e-15);
+
+    // During/after burst: concentration should increase
+    // Find the output at t~120 (after burst ends)
+    bool foundIncrease = false;
+    for (size_t i = 1; i < result.history.size(); ++i) {
+        if (result.history[i].contaminant.concentrations[1][0] > 1e-10) {
+            foundIncrease = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(foundIncrease);
+
+    // After burst ends (t>120), no more generation, concentration should decay/dilute
+    // Last few points should show decreasing or stable concentration
+    if (result.history.size() >= 4) {
+        double concAtEnd = result.history.back().contaminant.concentrations[1][0];
+        double concMid = result.history[result.history.size() / 2].contaminant.concentrations[1][0];
+        // Concentration at end should be less than peak (dilution)
+        // or at least the burst created measurable concentration
+        EXPECT_GT(concMid + concAtEnd, 0.0);
+    }
+}
