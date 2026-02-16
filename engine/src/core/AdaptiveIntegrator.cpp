@@ -5,7 +5,7 @@
 namespace contam {
 
 AdaptiveIntegrator::AdaptiveIntegrator(int numStates, const Config& config)
-    : numStates_(numStates), config_(config), suggestedDt_(config.dtMax)
+    : numStates_(numStates), config_(config), suggestedDt_(config.dtMin * 10.0)
 {
     if (numStates <= 0) {
         throw std::invalid_argument("AdaptiveIntegrator: numStates must be positive");
@@ -182,15 +182,20 @@ double AdaptiveIntegrator::step(double t, double dtTarget, std::vector<double>& 
         std::vector<double> ySolution;
 
         if (hasPrevious_ && config_.maxOrder >= 2) {
-            // Try BDF-2 for the solution
+            // BDF-2 for the solution
             order = 2;
             stepBDF2(tCurrent, dt, dtPrev_, y, yPrev_, ySolution, rhs);
 
-            // Error estimate: compare with BDF-1 solution
-            std::vector<double> yBDF1;
-            stepBDF1(tCurrent, dt, y, yBDF1, rhs);
+            // Error estimate: step-doubling (two half-steps of BDF-1 vs one full BDF-1)
+            std::vector<double> yFull;
+            stepBDF1(tCurrent, dt, y, yFull, rhs);
 
-            double error = estimateError(y, ySolution, yBDF1);
+            double halfDt = dt * 0.5;
+            std::vector<double> yHalf, yDouble;
+            stepBDF1(tCurrent, halfDt, y, yHalf, rhs);
+            stepBDF1(tCurrent + halfDt, halfDt, yHalf, yDouble, rhs);
+
+            double error = estimateError(y, yFull, yDouble);
 
             if (error > 1.0 && dt > config_.dtMin * 1.01) {
                 // Reject step, but only if we can still shrink
@@ -200,7 +205,7 @@ double AdaptiveIntegrator::step(double t, double dtTarget, std::vector<double>& 
                 continue;
             }
 
-            // Accept step (or forced accept at dtMin)
+            // Accept BDF-2 solution (highest order available)
             suggestedDt_ = computeNewDt(dt, error, order);
         } else {
             // BDF-1 only
