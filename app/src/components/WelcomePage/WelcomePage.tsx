@@ -35,10 +35,10 @@ export default function WelcomePage({ onStart }: WelcomePageProps) {
   };
 
   const steps = [
-    '在 2.5D 等距画布上画墙，围合区域自动生成房间',
+    '在 2D 画布上画墙，围合区域自动生成房间',
     '在墙上放置门窗、风机等气流路径组件',
     '配置污染物种类、排程和控制系统',
-    '运行稳态求解或瞬态仿真，查看 2.5D 结果动画',
+    '运行稳态求解或瞬态仿真，查看结果可视化',
   ];
 
   const actions = [
@@ -69,11 +69,11 @@ export default function WelcomePage({ onStart }: WelcomePageProps) {
           <div className="text-center">
             <h1 className="text-2xl font-bold text-foreground tracking-tight">CONTAM-Next</h1>
             <p className="text-sm text-muted-foreground mt-1">多区域气流与污染物传输仿真</p>
-            <span className="inline-block mt-2 px-2.5 py-1 text-[10px] font-data text-primary bg-primary/10 rounded-full border border-primary/20">v2.0 · 2.5D</span>
+            <span className="inline-block mt-2 px-2.5 py-1 text-[10px] font-data text-primary bg-primary/10 rounded-full border border-primary/20">v2.0 · 2D</span>
           </div>
         </div>
 
-        {/* Action buttons — chunky 2.5D cards */}
+        {/* Action buttons */}
         <div className="w-full grid grid-cols-2 gap-3">
           {actions.map((a, i) => (
             <button

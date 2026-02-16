@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { CloudSun, Upload, Trash2 } from 'lucide-react';
 import type { WeatherRecord } from '../../types';
+import { EmptyState } from '../ui/empty-state';
 
 /** Parse a CONTAM-style .wth weather file into WeatherRecord[] */
 function parseWthFile(text: string): { records: WeatherRecord[]; skipped: number; totalLines: number } {
@@ -184,9 +185,7 @@ export default function WeatherPanel() {
       )}
 
       {!hasData && (
-        <p className="text-xs text-muted-foreground italic">
-          尚未加载气象数据。支持 CONTAM .wth 格式（月 日 时 温度 气压 风速 风向 [湿度]）。
-        </p>
+        <EmptyState icon={CloudSun} message="尚未加载气象数据。支持 CONTAM .wth 格式。" />
       )}
     </div>
   );

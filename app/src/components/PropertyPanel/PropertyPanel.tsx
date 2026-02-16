@@ -15,6 +15,7 @@ import FilterPanel from '../FilterPanel/FilterPanel';
 import LibraryManager from '../LibraryManager/LibraryManager';
 import { ZoneProperties, EdgeProperties, PlacementProperties, StoryProperties } from './ZoneProperties';
 import { InputField } from '../ui/input-field';
+import { useRef, useEffect } from 'react';
 
 function NodeProperties() {
   const { nodes, selectedNodeId, updateNode, removeNode } = useAppStore();
@@ -372,17 +373,32 @@ export default function PropertyPanel() {
   const selectedFaceId = useCanvasStore(s => s.selectedFaceId);
   const selectedEdgeId = useCanvasStore(s => s.selectedEdgeId);
   const selectedPlacementId = useCanvasStore(s => s.selectedPlacementId);
+  const tabsScrollRef = useRef<HTMLDivElement>(null);
+
+  // Map vertical wheel → horizontal scroll on the tab bar
+  useEffect(() => {
+    const el = tabsScrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY;
+      }
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
 
   const hasOldSelection = selectedNodeId !== null || selectedLinkId !== null;
   const hasCanvasSelection = selectedFaceId !== null || selectedEdgeId !== null || selectedPlacementId !== null;
   const hasSelection = hasOldSelection || hasCanvasSelection;
 
   return (
-    <aside className="bg-card flex flex-col h-full overflow-hidden pt-12">
+    <aside className="bg-card flex flex-col h-full overflow-hidden">
       {hasSelection ? (
         <div className="flex flex-col h-full">
-          <div className="px-4 py-2.5 border-b border-border">
-            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">属性</h2>
+          <div className="px-4 py-3 border-b border-border shrink-0">
+            <h2 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">属性</h2>
           </div>
           <div className="px-4 py-3 flex-1 overflow-y-auto">
             {selectedPlacementId !== null ? <PlacementProperties /> :
@@ -394,18 +410,23 @@ export default function PropertyPanel() {
         </div>
       ) : (
         <Tabs defaultValue="model" className="flex flex-col h-full">
-          <div className="px-3 pt-2 pb-1 border-b border-border shrink-0">
-            <TabsList className="w-full h-auto flex-wrap gap-1 p-1">
-              <TabsTrigger value="model" className="text-[11px] px-2.5 py-1">模型</TabsTrigger>
-              <TabsTrigger value="contam" className="text-[11px] px-2.5 py-1">污染物</TabsTrigger>
-              <TabsTrigger value="schedule" className="text-[11px] px-2.5 py-1">排程</TabsTrigger>
-              <TabsTrigger value="control" className="text-[11px] px-2.5 py-1">控制</TabsTrigger>
-              <TabsTrigger value="occupant" className="text-[11px] px-2.5 py-1">人员</TabsTrigger>
-              <TabsTrigger value="weather" className="text-[11px] px-2.5 py-1">气象</TabsTrigger>
-              <TabsTrigger value="ahs" className="text-[11px] px-2.5 py-1">空调</TabsTrigger>
-              <TabsTrigger value="filter" className="text-[11px] px-2.5 py-1">过滤器</TabsTrigger>
-              <TabsTrigger value="library" className="text-[11px] px-2.5 py-1">库管理</TabsTrigger>
-            </TabsList>
+          <div className="border-b border-border shrink-0">
+            <div
+              ref={tabsScrollRef}
+              className="overflow-x-auto overflow-y-hidden scrollbar-hide"
+            >
+              <TabsList className="inline-flex w-max h-10 gap-0.5 p-1 bg-transparent">
+                <TabsTrigger value="model" className="shrink-0 text-xs px-3 py-1.5 rounded-md">模型</TabsTrigger>
+                <TabsTrigger value="contam" className="shrink-0 text-xs px-3 py-1.5 rounded-md">污染物</TabsTrigger>
+                <TabsTrigger value="schedule" className="shrink-0 text-xs px-3 py-1.5 rounded-md">排程</TabsTrigger>
+                <TabsTrigger value="control" className="shrink-0 text-xs px-3 py-1.5 rounded-md">控制</TabsTrigger>
+                <TabsTrigger value="occupant" className="shrink-0 text-xs px-3 py-1.5 rounded-md">人员</TabsTrigger>
+                <TabsTrigger value="weather" className="shrink-0 text-xs px-3 py-1.5 rounded-md">气象</TabsTrigger>
+                <TabsTrigger value="ahs" className="shrink-0 text-xs px-3 py-1.5 rounded-md">空调</TabsTrigger>
+                <TabsTrigger value="filter" className="shrink-0 text-xs px-3 py-1.5 rounded-md">过滤器</TabsTrigger>
+                <TabsTrigger value="library" className="shrink-0 text-xs px-3 py-1.5 rounded-md">库管理</TabsTrigger>
+              </TabsList>
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto px-4 py-3">
             <TabsContent value="model" className="mt-0">

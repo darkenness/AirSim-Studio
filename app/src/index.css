@@ -170,6 +170,15 @@ aside, header, footer, [class*="bg-card"], [class*="bg-background"], [class*="bg
   background: var(--muted-foreground);
 }
 
+/* ── Hide scrollbar utility ──────────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* ── Focus ring for accessibility ────────────────────────────────── */
 :focus-visible {
   outline: 1.5px solid var(--primary);

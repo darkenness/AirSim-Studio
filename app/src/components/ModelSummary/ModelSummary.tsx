@@ -46,7 +46,7 @@ export default function ModelSummary() {
         <span className="text-xs font-bold text-foreground">模型摘要</span>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px]">
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-[11px]">
         <div className="flex items-center gap-1">
           <Box size={10} className="text-blue-400" />
           <span className="text-muted-foreground">房间</span>
@@ -77,7 +77,7 @@ export default function ModelSummary() {
       {Object.keys(elemCounts).length > 0 && (
         <div className="flex flex-wrap gap-1 mt-0.5">
           {Object.entries(elemCounts).map(([type, count]) => (
-            <span key={type} className="px-1.5 py-0.5 text-[9px] bg-accent text-accent-foreground rounded-full">
+            <span key={type} className="px-1.5 py-0.5 text-[10px] bg-accent text-accent-foreground rounded-full">
               {elemLabels[type] ?? type} ×{count}
             </span>
           ))}
@@ -87,7 +87,7 @@ export default function ModelSummary() {
       {warnings.length > 0 && (
         <div className="flex flex-col gap-0.5 mt-1">
           {warnings.map((w, i) => (
-            <div key={i} className="flex items-start gap-1 text-[10px] text-amber-600">
+            <div key={i} className="flex items-start gap-1.5 text-[11px] text-amber-600">
               <AlertTriangle size={10} className="shrink-0 mt-0.5" />
               <span>{w}</span>
             </div>

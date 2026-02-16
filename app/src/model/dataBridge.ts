@@ -267,7 +267,7 @@ export function canvasToTopology(): TopologyJson {
 
   // Build final topology JSON, merging with existing contaminant/control data
   const topology: TopologyJson = {
-    description: 'CONTAM-Next 2.5D model',
+    description: 'CONTAM-Next 2D model',
     ambient: {
       temperature: appState.ambientTemperature,
       pressure: appState.ambientPressure,
@@ -492,8 +492,11 @@ export function validateModel(): { errors: string[]; warnings: string[] } {
 
   // AHS schedule reference integrity
   for (const ahs of appState.ahsSystems ?? []) {
-    if (ahs.scheduleId && !appState.schedules.find(s => s.id === ahs.scheduleId)) {
-      warnings.push(`AHS "${ahs.name}" 引用了不存在的时间表 ID: ${ahs.scheduleId}`);
+    if (ahs.outdoorAirScheduleId && ahs.outdoorAirScheduleId !== -1 && !appState.schedules.find(s => s.id === ahs.outdoorAirScheduleId)) {
+      warnings.push(`AHS "${ahs.name}" 引用了不存在的室外空气时间表 ID: ${ahs.outdoorAirScheduleId}`);
+    }
+    if (ahs.supplyFlowScheduleId && ahs.supplyFlowScheduleId !== -1 && !appState.schedules.find(s => s.id === ahs.supplyFlowScheduleId)) {
+      warnings.push(`AHS "${ahs.name}" 引用了不存在的送风时间表 ID: ${ahs.supplyFlowScheduleId}`);
     }
   }
 

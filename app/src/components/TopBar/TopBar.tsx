@@ -172,30 +172,30 @@ export default function TopBar() {
   };
 
   return (
-    <header className="h-12 border-b border-border flex items-center px-3 gap-1 shrink-0 select-none"
+    <header className="h-14 border-b border-border flex items-center px-4 pr-6 gap-1.5 shrink-0 select-none"
       style={{ background: 'var(--glass-bg)', backdropFilter: 'blur(12px)' }}
     >
       {/* Logo mark */}
-      <div className="flex items-center gap-2 mr-2 pl-0.5">
-        <div className="w-7 h-7 rounded-xl bg-primary flex items-center justify-center shadow-md border-b-2 border-primary/60">
-          <svg width="16" height="16" viewBox="0 0 12 12" fill="none">
+      <div className="flex items-center gap-2.5 mr-2 pl-0.5">
+        <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center shadow-md border-b-2 border-primary/60">
+          <svg width="18" height="18" viewBox="0 0 12 12" fill="none">
             <path d="M6 1L11 4V8L6 11L1 8V4L6 1Z" stroke="currentColor" strokeWidth="1.5" fill="none" className="text-primary-foreground"/>
             <circle cx="6" cy="6" r="1.5" fill="currentColor" className="text-primary-foreground"/>
           </svg>
         </div>
         <div className="flex flex-col leading-none">
           <span className="font-bold text-foreground text-sm tracking-tight">CONTAM</span>
-          <span className="text-muted-foreground text-[9px] font-medium">Next · 2.5D</span>
+          <span className="text-muted-foreground text-[10px] font-medium">Next · 2D</span>
         </div>
       </div>
 
-      <div className="w-px h-6 bg-border mx-1" />
+      <div className="w-px h-7 bg-border mx-1.5" />
 
-      {/* Run simulation — chunky 2.5D button */}
+      {/* Run simulation */}
       <Button onClick={handleRun} disabled={isRunning} size="sm"
-        className="h-8 gap-1.5 px-3 text-xs font-semibold rounded-xl border-b-[3px] border-primary/50 active:border-b-0 active:translate-y-0.5 transition-all shadow-md"
+        className="h-9 gap-1.5 px-4 text-xs font-semibold rounded-xl border-b-[3px] border-primary/50 active:border-b-0 active:translate-y-0.5 transition-all shadow-md"
       >
-        <Play size={13} fill="currentColor" />
+        <Play size={15} fill="currentColor" />
         {isRunning ? '计算中...' : (isTransient ? '瞬态仿真' : '稳态求解')}
       </Button>
 
@@ -204,26 +204,26 @@ export default function TopBar() {
           <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '100%' }} />
           </div>
-          <span className="text-[10px] font-data text-muted-foreground tabular-nums">{elapsed}s</span>
+          <span className="text-[11px] font-data text-muted-foreground tabular-nums">{elapsed}s</span>
         </div>
       )}
 
-      <div className="w-px h-6 bg-border mx-1" />
+      <div className="w-px h-7 bg-border mx-1.5" />
 
       {/* Edit group: Undo/Redo */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={() => { useCanvasStore.temporal.getState().undo(); useAppStore.temporal.getState().undo(); }}>
-              <Undo2 size={15} />
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => { useCanvasStore.temporal.getState().undo(); useAppStore.temporal.getState().undo(); }}>
+              <Undo2 size={18} />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">撤销 <kbd className="ml-1 px-1 py-0.5 bg-muted rounded-lg text-[10px] font-data">Ctrl+Z</kbd></TooltipContent>
         </Tooltip>
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={() => { useCanvasStore.temporal.getState().redo(); useAppStore.temporal.getState().redo(); }}>
-              <Redo2 size={15} />
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={() => { useCanvasStore.temporal.getState().redo(); useAppStore.temporal.getState().redo(); }}>
+              <Redo2 size={18} />
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">重做</TooltipContent>
@@ -233,11 +233,11 @@ export default function TopBar() {
       {/* Export */}
       {hasResults && (
         <>
-          <div className="w-px h-6 bg-border mx-1" />
+          <div className="w-px h-6 bg-border mx-1.5" />
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={handleExportCSV}>
-                <FileDown size={15} />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleExportCSV}>
+                <FileDown size={18} />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs rounded-xl">导出 CSV</TooltipContent>
@@ -248,11 +248,11 @@ export default function TopBar() {
       <div className="flex-1" />
 
       {/* Right group: Theme + File ops */}
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-1">
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={toggleDark}>
-              {isDark ? <Sun size={15} /> : <Moon size={15} />}
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={toggleDark}>
+              {isDark ? <Sun size={18} /> : <Moon size={18} />}
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">{isDark ? '浅色模式' : '深色模式'}</TooltipContent>
@@ -262,14 +262,14 @@ export default function TopBar() {
 
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={handleSave}><Save size={15} /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleSave}><Save size={18} /></Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">保存</TooltipContent>
         </Tooltip>
 
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl" onClick={handleOpen}><FolderOpen size={15} /></Button>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl" onClick={handleOpen}><FolderOpen size={18} /></Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" className="text-xs rounded-xl">打开</TooltipContent>
         </Tooltip>
@@ -278,7 +278,7 @@ export default function TopBar() {
           <Tooltip delayDuration={200}>
             <TooltipTrigger asChild>
               <AlertDialogTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="h-8 w-8 rounded-xl hover:bg-destructive/10 hover:text-destructive"><Trash2 size={15} /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-destructive/10 hover:text-destructive"><Trash2 size={18} /></Button>
               </AlertDialogTrigger>
             </TooltipTrigger>
             <TooltipContent side="bottom" className="text-xs rounded-xl">清空</TooltipContent>
@@ -290,7 +290,7 @@ export default function TopBar() {
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel className="rounded-xl">取消</AlertDialogCancel>
-              <AlertDialogAction onClick={clearAll} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">确认清空</AlertDialogAction>
+              <AlertDialogAction onClick={() => { clearAll(); useCanvasStore.getState().clearAll(); }} className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90">确认清空</AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>

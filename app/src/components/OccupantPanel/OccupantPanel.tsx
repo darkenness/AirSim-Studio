@@ -2,6 +2,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, User, Clock } from 'lucide-react';
 import type { OccupantZoneAssignment } from '../../types';
 import { useMergedRooms } from '../../hooks/useMergedRooms';
+import { EmptyState } from '../ui/empty-state';
 
 export default function OccupantPanel() {
   const { occupants, addOccupant, removeOccupant, updateOccupant, species, addSource } = useAppStore();
@@ -84,13 +85,11 @@ export default function OccupantPanel() {
       </div>
 
       {occupants.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">
-          尚未添加人员。点击 + 创建虚拟人员以追踪暴露。
-        </p>
+        <EmptyState icon={User} message="尚未添加人员" actionText="添加人员" onAction={handleAdd} />
       )}
 
       {occupants.map((occ) => (
-        <div key={occ.id} className="border border-border rounded-md p-2 flex flex-col gap-2 bg-card">
+        <div key={occ.id} className="border border-border rounded-md p-3 flex flex-col gap-2.5 bg-card">
           {/* Header */}
           <div className="flex items-center gap-1">
             <User size={12} className="text-indigo-400" />
@@ -108,7 +107,7 @@ export default function OccupantPanel() {
           </div>
 
           {/* Parameters */}
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-0.5">
               <span className="text-[11px] font-medium text-muted-foreground">呼吸率</span>
               <div className="flex items-center gap-1">
@@ -138,7 +137,7 @@ export default function OccupantPanel() {
           </div>
 
           {/* Movement Schedule */}
-          <div className="border-t border-border pt-1.5">
+          <div className="border-t border-border pt-2">
             <div className="flex items-center gap-1 mb-1">
               <Clock size={11} className="text-teal-500" />
               <span className="text-[11px] font-medium text-muted-foreground">移动时间表</span>
@@ -151,7 +150,7 @@ export default function OccupantPanel() {
             </div>
 
             {occ.schedule.length === 0 && (
-              <p className="text-[10px] text-muted-foreground italic">无时间表条目</p>
+              <p className="text-[11px] text-muted-foreground italic">无时间表条目</p>
             )}
 
             {occ.schedule.map((entry, idx) => (

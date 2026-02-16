@@ -6,17 +6,18 @@
 
 namespace contam {
 
+struct AdaptiveIntegratorConfig {
+    double rtol = 1e-4;       // relative tolerance
+    double atol = 1e-8;       // absolute tolerance
+    double dtMin = 0.01;      // minimum time step (s)
+    double dtMax = 3600.0;    // maximum time step (s)
+    double safetyFactor = 0.9;
+    int maxOrder = 2;         // BDF order (1 or 2)
+};
+
 class AdaptiveIntegrator {
 public:
-    struct Config {
-        double rtol = 1e-4;       // relative tolerance
-        double atol = 1e-8;       // absolute tolerance
-        double dtMin = 0.01;      // minimum time step (s)
-        double dtMax = 3600.0;    // maximum time step (s)
-        double safetyFactor = 0.9;
-        int maxOrder = 2;         // BDF order (1 or 2)
-        Config() = default;
-    };
+    using Config = AdaptiveIntegratorConfig;
 
     AdaptiveIntegrator(int numStates, const Config& config = Config());
 

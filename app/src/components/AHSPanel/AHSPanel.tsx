@@ -2,26 +2,8 @@ import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, Wind } from 'lucide-react';
 import type { AHSZoneConnection } from '../../types';
 import { useMergedRooms } from '../../hooks/useMergedRooms';
-
-function InputField({ label, value, onChange, unit, step }: {
-  label: string; value: number; onChange: (v: number) => void; unit?: string; step?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          value={value}
-          step={step ?? '0.001'}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="flex-1 px-2 py-1 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-background"
-        />
-        {unit && <span className="text-[10px] text-muted-foreground min-w-[28px]">{unit}</span>}
-      </div>
-    </label>
-  );
-}
+import { InputField } from '../ui/input-field';
+import { EmptyState } from '../ui/empty-state';
 
 function ZoneConnectionEditor({ connections, onChange, label }: {
   connections: AHSZoneConnection[];
@@ -46,9 +28,9 @@ function ZoneConnectionEditor({ connections, onChange, label }: {
   };
 
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col gap-1.5">
       <div className="flex items-center gap-1">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
         <button onClick={addConnection} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground">
           <Plus size={12} />
         </button>
@@ -79,7 +61,7 @@ function ZoneConnectionEditor({ connections, onChange, label }: {
         </div>
       ))}
       {connections.length === 0 && (
-        <span className="text-[10px] text-muted-foreground italic">无连接区域</span>
+        <span className="text-[11px] text-muted-foreground italic">无连接区域</span>
       )}
     </div>
   );
@@ -119,13 +101,11 @@ export default function AHSPanel() {
       </div>
 
       {ahsSystems.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">
-          尚未添加空调系统。点击 + 创建 AHS 以模拟机械通风。
-        </p>
+        <EmptyState icon={Wind} message="尚未添加空调系统" actionText="添加 AHS" onAction={handleAdd} />
       )}
 
       {ahsSystems.map((ahs) => (
-        <div key={ahs.id} className="flex flex-col gap-2 p-2 border border-border rounded-lg">
+        <div key={ahs.id} className="flex flex-col gap-2.5 p-3 border border-border rounded-lg">
           {/* Header */}
           <div className="flex items-center gap-2">
             <input
@@ -143,18 +123,18 @@ export default function AHSPanel() {
 
           {/* Flow rates */}
           <div className="grid grid-cols-2 gap-2">
-            <InputField label="送风量" value={ahs.supplyFlow} unit="m³/s" step="0.01"
-              onChange={(v) => updateAHS(ahs.id, { supplyFlow: Math.max(0, v) })} />
-            <InputField label="回风量" value={ahs.returnFlow} unit="m³/s" step="0.01"
-              onChange={(v) => updateAHS(ahs.id, { returnFlow: Math.max(0, v) })} />
-            <InputField label="新风量" value={ahs.outdoorAirFlow} unit="m³/s" step="0.005"
-              onChange={(v) => updateAHS(ahs.id, { outdoorAirFlow: Math.max(0, v) })} />
-            <InputField label="排风量" value={ahs.exhaustFlow} unit="m³/s" step="0.005"
-              onChange={(v) => updateAHS(ahs.id, { exhaustFlow: Math.max(0, v) })} />
+            <InputField label="送风量" value={ahs.supplyFlow} unit="m³/s" type="number" step="0.01"
+              onChange={(v) => updateAHS(ahs.id, { supplyFlow: Math.max(0, parseFloat(v) || 0) })} />
+            <InputField label="回风量" value={ahs.returnFlow} unit="m³/s" type="number" step="0.01"
+              onChange={(v) => updateAHS(ahs.id, { returnFlow: Math.max(0, parseFloat(v) || 0) })} />
+            <InputField label="新风量" value={ahs.outdoorAirFlow} unit="m³/s" type="number" step="0.005"
+              onChange={(v) => updateAHS(ahs.id, { outdoorAirFlow: Math.max(0, parseFloat(v) || 0) })} />
+            <InputField label="排风量" value={ahs.exhaustFlow} unit="m³/s" type="number" step="0.005"
+              onChange={(v) => updateAHS(ahs.id, { exhaustFlow: Math.max(0, parseFloat(v) || 0) })} />
           </div>
 
-          <InputField label="送风温度" value={+(ahs.supplyTemperature - 273.15).toFixed(2)} unit="°C" step="0.5"
-            onChange={(v) => updateAHS(ahs.id, { supplyTemperature: Math.max(250, Math.min(350, v + 273.15)) })} />
+          <InputField label="送风温度" value={+(ahs.supplyTemperature - 273.15).toFixed(2)} unit="°C" type="number" step="0.5"
+            onChange={(v) => updateAHS(ahs.id, { supplyTemperature: Math.max(250, Math.min(350, (parseFloat(v) || 0) + 273.15)) })} />
 
           {/* Zone connections */}
           <ZoneConnectionEditor
@@ -171,7 +151,7 @@ export default function AHSPanel() {
           {/* Schedule bindings */}
           <div className="grid grid-cols-2 gap-2">
             <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">送风排程</span>
+              <span className="text-xs font-semibold text-muted-foreground tracking-wider">送风排程</span>
               <select
                 value={ahs.supplyFlowScheduleId}
                 onChange={(e) => updateAHS(ahs.id, { supplyFlowScheduleId: parseInt(e.target.value) })}
@@ -182,7 +162,7 @@ export default function AHSPanel() {
               </select>
             </label>
             <label className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-semibold text-muted-foreground tracking-wider">新风排程</span>
+              <span className="text-xs font-semibold text-muted-foreground tracking-wider">新风排程</span>
               <select
                 value={ahs.outdoorAirScheduleId}
                 onChange={(e) => updateAHS(ahs.id, { outdoorAirScheduleId: parseInt(e.target.value) })}
@@ -196,13 +176,13 @@ export default function AHSPanel() {
 
           {/* Balance check */}
           {Math.abs(ahs.supplyFlow - ahs.returnFlow) > 0.001 && (
-            <div className="px-2 py-1 bg-amber-50 dark:bg-amber-950/30 rounded text-[10px] text-amber-600 dark:text-amber-400">
+            <div className="px-2 py-1 bg-amber-50 dark:bg-amber-950/30 rounded text-[11px] text-amber-600 dark:text-amber-400">
               送风量 ≠ 回风量（差值: {(ahs.supplyFlow - ahs.returnFlow).toFixed(4)} m³/s）
             </div>
           )}
 
           {/* OA fraction display */}
-          <div className="px-2 py-1 bg-muted rounded text-[10px] text-muted-foreground">
+          <div className="px-2 py-1 bg-muted rounded text-[11px] text-muted-foreground">
             新风比: {ahs.supplyFlow > 0 ? ((ahs.outdoorAirFlow / ahs.supplyFlow) * 100).toFixed(1) : 0}%
             &nbsp;|&nbsp; 回风: {(ahs.supplyFlow - ahs.outdoorAirFlow).toFixed(4)} m³/s
           </div>

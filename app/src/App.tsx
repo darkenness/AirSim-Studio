@@ -124,94 +124,107 @@ function App() {
 
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-screen w-screen bg-background text-foreground" onDragOver={handleDragOver} onDrop={handleDrop}>
+      <div className="flex flex-col h-screen w-screen overflow-hidden bg-background text-foreground" onDragOver={handleDragOver} onDrop={handleDrop}>
         {showWelcome ? (
           <>
             <TopBar />
             <WelcomePage onStart={() => setShowWelcome(false)} />
           </>
         ) : (
-          <div className="relative flex-1 min-h-0 overflow-hidden">
-            {/* Full-screen canvas (z-0) */}
-            <ErrorBoundary fallbackTitle="画布渲染出错">
-              {activeView === 'canvas' ? (
-                <Canvas2D />
-              ) : (
-                <ControlFlowCanvas />
-              )}
-            </ErrorBoundary>
+          <>
+            {/* ── Row 1: TopBar (fixed height, in document flow) ── */}
+            <TopBar />
 
-            {/* Floating TopBar (z-20) */}
-            <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none">
-              <div className="pointer-events-auto">
-                <TopBar />
-              </div>
-            </div>
-
-            {/* Floating VerticalToolbar (z-20, self-positioned) */}
-            <VerticalToolbar />
-
-            {/* Floating view tab switcher (z-20) */}
-            <div className="absolute top-14 left-1/2 -translate-x-1/2 z-20">
-              <div className="flex gap-1 p-1 rounded-xl bg-card/80 backdrop-blur-md border border-border shadow-md">
-                <button
-                  onClick={() => setActiveView('canvas')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeView === 'canvas' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
-                  }`}
-                >
-                  <Layers size={13} />
-                  2D 画布
-                </button>
-                <button
-                  onClick={() => setActiveView('control')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    activeView === 'control' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent text-muted-foreground'
-                  }`}
-                >
-                  <GitBranch size={13} />
-                  控制网络
-                </button>
-              </div>
-            </div>
-
-            {/* Sidebar toggle button (z-20) */}
-            <button
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="absolute top-14 right-3 z-20 p-2 rounded-xl bg-card/80 backdrop-blur-md border border-border shadow-md hover:bg-accent transition-colors"
-              title={sidebarOpen ? '关闭侧边栏' : '打开侧边栏'}
-            >
-              {sidebarOpen ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}
-            </button>
-
-            {/* Sliding Sidebar (z-30) */}
-            <div
-              className={`absolute top-0 right-0 bottom-0 w-[340px] z-30 bg-card/95 backdrop-blur-xl border-l border-border shadow-xl transition-transform duration-200 ease-out overflow-y-auto ${
-                sidebarOpen ? 'translate-x-0' : 'translate-x-full'
-              }`}
-            >
-              <ErrorBoundary fallbackTitle="属性面板出错">
-                <PropertyPanel />
+            {/* ── Row 2: Main workspace (flex-1, contains canvas + floating UI) ── */}
+            <div className="flex-1 min-h-0 relative overflow-hidden">
+              {/* Full-screen canvas (z-0) */}
+              <ErrorBoundary fallbackTitle="画布渲染出错">
+                {activeView === 'canvas' ? (
+                  <Canvas2D />
+                ) : (
+                  <ControlFlowCanvas />
+                )}
               </ErrorBoundary>
-            </div>
 
-            {/* Floating BottomBar (z-20) */}
-            <div className="absolute bottom-8 left-3 right-3 z-20 max-w-[900px] mx-auto">
-              <div className="rounded-xl border border-border shadow-xl overflow-hidden">
-              <ErrorBoundary fallbackTitle="结果面板出错">
-                <BottomPanel />
-              </ErrorBoundary>
+              {/* Floating VerticalToolbar (z-20, self-positioned) */}
+              <VerticalToolbar />
+
+              {/* Floating view tab switcher (z-20) */}
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20">
+                <div className="flex gap-1 p-1.5 rounded-2xl"
+                  style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', backdropFilter: 'blur(16px)', boxShadow: 'var(--shadow-soft)' }}
+                >
+                  <button
+                    onClick={() => setActiveView('canvas')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all duration-150 ${
+                      activeView === 'canvas'
+                        ? 'bg-primary text-primary-foreground shadow-md border-b-[3px] border-primary/70'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <Layers size={15} />
+                    2D 画布
+                  </button>
+                  <button
+                    onClick={() => setActiveView('control')}
+                    className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-medium transition-all duration-150 ${
+                      activeView === 'control'
+                        ? 'bg-primary text-primary-foreground shadow-md border-b-[3px] border-primary/70'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    <GitBranch size={15} />
+                    控制网络
+                  </button>
+                </div>
               </div>
+
+              {/* Sidebar toggle button — floats independently, shifts with sidebar */}
+              <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className={`absolute top-3 z-20 w-10 h-10 flex items-center justify-center rounded-2xl transition-all duration-200 hover:scale-110 active:scale-95 active:translate-y-0.5 text-muted-foreground hover:text-foreground ${
+                  sidebarOpen ? 'right-[348px]' : 'right-3'
+                }`}
+                style={{
+                  background: 'var(--glass-bg)',
+                  border: '1px solid var(--glass-border)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: 'var(--shadow-soft)',
+                }}
+                title={sidebarOpen ? '关闭侧边栏' : '打开侧边栏'}
+              >
+                {sidebarOpen ? <PanelRightClose size={18} strokeWidth={2.2} /> : <PanelRightOpen size={18} strokeWidth={2.2} />}
+              </button>
+
+              {/* Sliding Sidebar (z-30) */}
+              <div
+                className={`absolute top-0 right-0 bottom-0 w-[340px] z-30 bg-card/95 backdrop-blur-xl border-l border-border shadow-xl transition-transform duration-200 ease-out overflow-hidden flex flex-col ${
+                  sidebarOpen ? 'translate-x-0' : 'translate-x-full'
+                }`}
+              >
+                <ErrorBoundary fallbackTitle="属性面板出错">
+                  <PropertyPanel />
+                </ErrorBoundary>
+              </div>
+
+              {/* Floating BottomBar (z-20) */}
+              <div className="absolute bottom-3 left-3 right-3 z-20 max-w-[900px] mx-auto">
+                <div className="rounded-xl overflow-hidden"
+                  style={{ background: 'var(--glass-bg)', border: '1px solid var(--glass-border)', backdropFilter: 'blur(16px)', boxShadow: 'var(--shadow-soft)' }}
+                >
+                  <ErrorBoundary fallbackTitle="结果面板出错">
+                    <BottomPanel />
+                  </ErrorBoundary>
+                </div>
+              </div>
+
+              {/* Simulation loading overlay (z-50) */}
+              <SimulationOverlay />
             </div>
 
-            {/* Simulation loading overlay (z-50) */}
-            <SimulationOverlay />
-
-            {/* StatusBar at very bottom */}
-            <div className="absolute bottom-0 left-0 right-0 z-10">
-              <StatusBar />
-            </div>
-          </div>
+            {/* ── Row 3: StatusBar (fixed height, in document flow) ── */}
+            <StatusBar />
+          </>
         )}
       </div>
       <Toaster />

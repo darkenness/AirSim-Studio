@@ -10,7 +10,6 @@ import {
   findOrCreateVertex,
   findEdgeBetween,
   edgeLength,
-  getEdge,
   getVertex,
   getEdgeEndpoints,
   getPositionOnEdge,

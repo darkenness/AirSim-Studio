@@ -11,6 +11,8 @@ import {
   type Connection,
   type Edge,
   type Node,
+  type NodeChange,
+  type EdgeChange,
   MarkerType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -210,10 +212,10 @@ export default function ControlFlowCanvas() {
       const prev = controlSystem;
       const posChanged = prev.sensors.some((s, i) => {
         const ns = newCS.sensors[i];
-        return ns && ((s as any).x !== ns.x || (s as any).y !== ns.y);
+        return ns && ((s as any).x !== (ns as any).x || (s as any).y !== (ns as any).y);
       }) || prev.controllers.some((c, i) => {
         const nc = newCS.controllers[i];
-        return nc && (c.sensorId !== nc.sensorId || c.actuatorId !== nc.actuatorId || (c as any).x !== nc.x || (c as any).y !== nc.y);
+        return nc && (c.sensorId !== nc.sensorId || c.actuatorId !== nc.actuatorId || (c as any).x !== (nc as any).x || (c as any).y !== (nc as any).y);
       });
       if (posChanged) {
         syncingFromStore.current = true;

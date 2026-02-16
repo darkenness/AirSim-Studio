@@ -1,6 +1,6 @@
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, Calendar, Tag } from 'lucide-react';
-import type { DayType, WeekSchedule } from '../../types';
+import { EmptyState } from '../ui/empty-state';
 
 const DAY_NAMES = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const DAY_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#ec4899', '#f43f5e', '#ef4444'];
@@ -34,21 +34,21 @@ function DayTypeSection() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {DEFAULT_DAY_TYPES.map(tpl => (
           <button key={tpl.name} onClick={() => handleAddTemplate(tpl)}
-            className="px-1.5 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors">
+            className="px-2.5 py-1 text-xs font-medium bg-background hover:bg-accent text-foreground rounded-md border border-border transition-colors">
             + {tpl.name}
           </button>
         ))}
       </div>
 
       {dayTypes.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic">点击上方按钮添加日类型，或点击 + 自定义。</p>
+        <EmptyState icon={Tag} message="点击上方按钮添加日类型" />
       )}
 
       {dayTypes.map(dt => (
-        <div key={dt.id} className="border border-border rounded-md p-2 flex flex-col gap-1.5 bg-card">
+        <div key={dt.id} className="border border-border rounded-md p-3 flex flex-col gap-2 bg-card">
           <div className="flex items-center gap-1">
             <span className="text-[10px] text-indigo-500 font-bold">#{dt.id}</span>
             <input value={dt.name} onChange={e => updateDayType(dt.id, { name: e.target.value })}
@@ -58,7 +58,7 @@ function DayTypeSection() {
             </button>
           </div>
           <label className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-semibold text-muted-foreground">关联时间表</span>
+            <span className="text-xs font-semibold text-muted-foreground">关联时间表</span>
             <select value={dt.scheduleId} onChange={e => updateDayType(dt.id, { scheduleId: parseInt(e.target.value) })}
               className="px-1.5 py-1 text-xs border border-border rounded focus:outline-none focus:ring-1 focus:ring-ring bg-background">
               <option value={-1}>（无）</option>
@@ -96,11 +96,11 @@ function WeekScheduleSection() {
       </div>
 
       {dayTypes.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic">请先添加日类型。</p>
+        <EmptyState icon={Calendar} message="请先添加日类型" />
       )}
 
       {weekSchedules.length === 0 && dayTypes.length > 0 && (
-        <p className="text-[10px] text-muted-foreground italic">尚未添加周计划。点击 + 添加。</p>
+        <EmptyState icon={Calendar} message="尚未添加周计划" actionText="添加周计划" onAction={handleAdd} />
       )}
 
       {weekSchedules.map(ws => (
@@ -127,14 +127,14 @@ function WeekScheduleSection() {
                       style={{ backgroundColor: dt ? DAY_COLORS[dayIdx % DAY_COLORS.length] : 'var(--muted)' }}
                       title={`${dayName}: ${dt?.name ?? '未指定'}`}
                     />
-                    <span className="text-[8px] text-muted-foreground leading-none">{dayName.slice(1)}</span>
+                    <span className="text-[9px] text-muted-foreground leading-none">{dayName.slice(1)}</span>
                   </div>
                 );
               })}
             </div>
             {DAY_NAMES.map((dayName, dayIdx) => (
               <div key={dayIdx} className="flex items-center gap-2">
-                <span className="text-[10px] font-semibold text-muted-foreground w-8">{dayName}</span>
+                <span className="text-xs font-semibold text-muted-foreground w-8">{dayName}</span>
                 <select
                   value={ws.dayTypes[dayIdx] ?? -1}
                   onChange={e => {

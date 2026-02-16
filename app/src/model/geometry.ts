@@ -259,6 +259,236 @@ export function findEdgeBetween(geo: Geometry, v1Id: string, v2Id: string): GeoE
 }
 
 /**
+ * Check if a point lies on an edge (within tolerance).
+ * Returns the parametric t value (0..1) or null if not on edge.
+ */
+function pointOnEdge(geo: Geometry, edge: GeoEdge, px: number, py: number, tolerance: number = 0.15): number | null {
+  const v1 = getVertex(geo, edge.vertexIds[0]);
+  const v2 = getVertex(geo, edge.vertexIds[1]);
+  if (!v1 || !v2) return null;
+
+  const ex = v2.x - v1.x;
+  const ey = v2.y - v1.y;
+  const lenSq = ex * ex + ey * ey;
+  if (lenSq < 1e-10) return null;
+
+  // Project point onto edge line
+  const t = ((px - v1.x) * ex + (py - v1.y) * ey) / lenSq;
+  if (t <= 0.02 || t >= 0.98) return null; // too close to endpoints
+
+  // Distance from point to edge line
+  const projX = v1.x + t * ex;
+  const projY = v1.y + t * ey;
+  const dist = Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+  if (dist > tolerance) return null;
+
+  return t;
+}
+
+/**
+ * Split an edge at a given vertex, replacing the original edge with two new edges.
+ * The vertex must already exist in the geometry.
+ */
+function splitEdgeAtVertex(geo: Geometry, edgeId: string, vertexId: string): void {
+  const edge = getEdge(geo, edgeId);
+  if (!edge) return;
+  const splitV = getVertex(geo, vertexId);
+  if (!splitV) return;
+
+  const [v1Id, v2Id] = edge.vertexIds;
+
+  // Remove old edge from vertices
+  const v1 = getVertex(geo, v1Id);
+  const v2 = getVertex(geo, v2Id);
+  if (v1) v1.edgeIds = v1.edgeIds.filter(eid => eid !== edgeId);
+  if (v2) v2.edgeIds = v2.edgeIds.filter(eid => eid !== edgeId);
+
+  // Remove old edge
+  geo.edges = geo.edges.filter(e => e.id !== edgeId);
+
+  // Create two new edges
+  const e1: GeoEdge = {
+    id: generateId('e_'),
+    vertexIds: [v1Id, vertexId],
+    faceIds: [],
+    wallHeight: edge.wallHeight,
+    wallThickness: edge.wallThickness,
+    isExterior: true,
+  };
+  const e2: GeoEdge = {
+    id: generateId('e_'),
+    vertexIds: [vertexId, v2Id],
+    faceIds: [],
+    wallHeight: edge.wallHeight,
+    wallThickness: edge.wallThickness,
+    isExterior: true,
+  };
+
+  geo.edges.push(e1, e2);
+  if (v1) v1.edgeIds.push(e1.id);
+  splitV.edgeIds.push(e1.id, e2.id);
+  if (v2) v2.edgeIds.push(e2.id);
+
+  // Migrate placements from old edge to appropriate new edge
+  // (handled externally by the store if needed)
+}
+
+/**
+ * After creating/finding a vertex, check if it lies on any existing edge
+ * and split that edge if so. This enables T-junctions for room subdivision.
+ */
+function trySplitEdgesAtVertex(geo: Geometry, vertex: GeoVertex): void {
+  // Collect edges to split (avoid mutating while iterating)
+  const toSplit: Array<{ edgeId: string }> = [];
+  for (const edge of geo.edges) {
+    // Skip edges that already connect to this vertex
+    if (edge.vertexIds.includes(vertex.id)) continue;
+    const t = pointOnEdge(geo, edge, vertex.x, vertex.y);
+    if (t !== null) {
+      toSplit.push({ edgeId: edge.id });
+    }
+  }
+  for (const { edgeId } of toSplit) {
+    splitEdgeAtVertex(geo, edgeId, vertex.id);
+  }
+}
+
+/**
+ * After creating a new edge, check if any existing vertices (not its own endpoints)
+ * lie on it. If so, split the edge at those vertices, sorted by parametric t.
+ * This handles the case where a new wall is longer than an existing shared wall.
+ */
+function splitNewEdgeAtExistingVertices(
+  geo: Geometry,
+  edgeId: string,
+  height: number,
+  thickness: number,
+): void {
+  const edge = getEdge(geo, edgeId);
+  if (!edge) return;
+
+  const v1 = getVertex(geo, edge.vertexIds[0]);
+  const v2 = getVertex(geo, edge.vertexIds[1]);
+  if (!v1 || !v2) return;
+
+  // Collect vertices that lie on this edge (with their t values)
+  const splits: Array<{ vertex: GeoVertex; t: number }> = [];
+  for (const v of geo.vertices) {
+    if (v.id === edge.vertexIds[0] || v.id === edge.vertexIds[1]) continue;
+    const t = pointOnEdge(geo, edge, v.x, v.y);
+    if (t !== null) {
+      splits.push({ vertex: v, t });
+    }
+  }
+
+  if (splits.length === 0) return;
+
+  // Sort by t so we split from start to end
+  splits.sort((a, b) => a.t - b.t);
+
+  // Remove the original edge
+  const origV1Id = edge.vertexIds[0];
+  const origV2Id = edge.vertexIds[1];
+  const ov1 = getVertex(geo, origV1Id);
+  const ov2 = getVertex(geo, origV2Id);
+  if (ov1) ov1.edgeIds = ov1.edgeIds.filter(eid => eid !== edgeId);
+  if (ov2) ov2.edgeIds = ov2.edgeIds.filter(eid => eid !== edgeId);
+  geo.edges = geo.edges.filter(e => e.id !== edgeId);
+
+  // Create chain of edges: v1 -> split[0] -> split[1] -> ... -> v2
+  const chain = [origV1Id, ...splits.map(s => s.vertex.id), origV2Id];
+  for (let i = 0; i < chain.length - 1; i++) {
+    const aId = chain[i];
+    const bId = chain[i + 1];
+    // Skip if edge already exists (e.g. the shared wall segment)
+    if (findEdgeBetween(geo, aId, bId)) continue;
+
+    const newEdge: GeoEdge = {
+      id: generateId('e_'),
+      vertexIds: [aId, bId],
+      faceIds: [],
+      wallHeight: height,
+      wallThickness: thickness,
+      isExterior: true,
+    };
+    geo.edges.push(newEdge);
+    const va = getVertex(geo, aId);
+    const vb = getVertex(geo, bId);
+    if (va) va.edgeIds.push(newEdge.id);
+    if (vb) vb.edgeIds.push(newEdge.id);
+  }
+}
+
+/**
+ * Compute intersection point of two line segments (p1→p2) and (p3→p4).
+ * Returns { x, y, t, u } if they intersect (0 < t < 1 and 0 < u < 1),
+ * or null if they don't. t is parametric on first segment, u on second.
+ */
+function segmentIntersection(
+  p1x: number, p1y: number, p2x: number, p2y: number,
+  p3x: number, p3y: number, p4x: number, p4y: number,
+): { x: number; y: number; t: number; u: number } | null {
+  const d1x = p2x - p1x, d1y = p2y - p1y;
+  const d2x = p4x - p3x, d2y = p4y - p3y;
+  const denom = d1x * d2y - d1y * d2x;
+  if (Math.abs(denom) < 1e-10) return null; // parallel or collinear
+
+  const t = ((p3x - p1x) * d2y - (p3y - p1y) * d2x) / denom;
+  const u = ((p3x - p1x) * d1y - (p3y - p1y) * d1x) / denom;
+
+  // Strict interior intersection (exclude endpoints)
+  if (t <= 0.01 || t >= 0.99 || u <= 0.01 || u >= 0.99) return null;
+
+  return {
+    x: p1x + t * d1x,
+    y: p1y + t * d1y,
+    t, u,
+  };
+}
+
+/**
+ * Find all intersection points between a line segment (v1→v2) and existing edges.
+ * Creates vertices at intersection points and splits the existing edges.
+ * Returns the list of new intersection vertices (sorted by t along v1→v2).
+ */
+function splitIntersectingEdges(
+  geo: Geometry,
+  v1: GeoVertex, v2: GeoVertex,
+): GeoVertex[] {
+  const intersections: Array<{ vertex: GeoVertex; t: number; edgeId: string }> = [];
+
+  // Snapshot edges to avoid mutation during iteration
+  const edgeSnapshot = [...geo.edges];
+
+  for (const edge of edgeSnapshot) {
+    // Skip edges that share an endpoint with v1 or v2
+    if (edge.vertexIds.includes(v1.id) || edge.vertexIds.includes(v2.id)) continue;
+
+    const ev1 = getVertex(geo, edge.vertexIds[0]);
+    const ev2 = getVertex(geo, edge.vertexIds[1]);
+    if (!ev1 || !ev2) continue;
+
+    const hit = segmentIntersection(
+      v1.x, v1.y, v2.x, v2.y,
+      ev1.x, ev1.y, ev2.x, ev2.y,
+    );
+    if (!hit) continue;
+
+    // Create vertex at intersection point
+    const { vertex: iv, isNew } = findOrCreateVertex(geo, hit.x, hit.y, 0.05);
+    if (isNew) {
+      // Split the existing edge at the intersection vertex
+      splitEdgeAtVertex(geo, edge.id, iv.id);
+    }
+    intersections.push({ vertex: iv, t: hit.t, edgeId: edge.id });
+  }
+
+  // Sort by t along v1→v2
+  intersections.sort((a, b) => a.t - b.t);
+  return intersections.map(i => i.vertex);
+}
+
+/**
  * Add a wall (edge) between two points. Snaps to existing vertices.
  * Returns the created/found edge.
  */
@@ -273,7 +503,44 @@ export function addWall(
   const { vertex: v1 } = findOrCreateVertex(geo, x1, y1, snapThreshold);
   const { vertex: v2 } = findOrCreateVertex(geo, x2, y2, snapThreshold);
 
-  // Check if edge already exists
+  // BUG-4: Split existing edges at new vertices (T-junction support)
+  trySplitEdgesAtVertex(geo, v1);
+  trySplitEdgesAtVertex(geo, v2);
+
+  // X-junction: find intersections between the new wall line and existing edges,
+  // create vertices at intersection points and split existing edges
+  const intersectionVerts = splitIntersectingEdges(geo, v1, v2);
+
+  if (intersectionVerts.length > 0) {
+    // Build chain: v1 -> intersection[0] -> ... -> intersection[n] -> v2
+    const chain = [v1, ...intersectionVerts, v2];
+    let lastEdge: GeoEdge | null = null;
+    for (let i = 0; i < chain.length - 1; i++) {
+      const a = chain[i], b = chain[i + 1];
+      if (a.id === b.id) continue;
+      const existing = findEdgeBetween(geo, a.id, b.id);
+      if (existing) { lastEdge = existing; continue; }
+
+      const seg: GeoEdge = {
+        id: generateId('e_'),
+        vertexIds: [a.id, b.id],
+        faceIds: [],
+        wallHeight: height,
+        wallThickness: thickness,
+        isExterior: true,
+      };
+      geo.edges.push(seg);
+      a.edgeIds.push(seg.id);
+      b.edgeIds.push(seg.id);
+      lastEdge = seg;
+
+      // Also split this segment at any existing vertices on it
+      splitNewEdgeAtExistingVertices(geo, seg.id, height, thickness);
+    }
+    return lastEdge!;
+  }
+
+  // No intersections — simple case
   const existing = findEdgeBetween(geo, v1.id, v2.id);
   if (existing) return existing;
 
@@ -288,6 +555,11 @@ export function addWall(
   geo.edges.push(edge);
   v1.edgeIds.push(edge.id);
   v2.edgeIds.push(edge.id);
+
+  // Split the new edge at any existing vertices that lie on it.
+  // This handles the case where the new wall is longer than an existing wall
+  // sharing the same line — existing intermediate vertices must split the new edge.
+  splitNewEdgeAtExistingVertices(geo, edge.id, height, thickness);
 
   return edge;
 }
@@ -510,9 +782,52 @@ export function rebuildFaces(geo: Geometry): void {
 }
 
 function updateEdgeExteriorStatus(geo: Geometry): void {
+  // First pass: edges with 2+ faces are always interior
   for (const edge of geo.edges) {
     edge.isExterior = edge.faceIds.length <= 1;
   }
+
+  // Second pass: for edges with only 1 face, check if the edge midpoint
+  // lies inside another face (nested room case).
+  // If so, the edge is interior (not exterior).
+  for (const edge of geo.edges) {
+    if (!edge.isExterior) continue; // already interior
+    if (edge.faceIds.length === 0) continue; // dangling edge, always exterior
+
+    const v1 = getVertex(geo, edge.vertexIds[0]);
+    const v2 = getVertex(geo, edge.vertexIds[1]);
+    if (!v1 || !v2) continue;
+
+    const midX = (v1.x + v2.x) / 2;
+    const midY = (v1.y + v2.y) / 2;
+    const ownFaceId = edge.faceIds[0];
+
+    for (const face of geo.faces) {
+      if (face.id === ownFaceId) continue; // skip own face
+      const verts = getFaceVertices(geo, face);
+      if (verts.length < 3) continue;
+      if (pointInPolygon(midX, midY, verts)) {
+        edge.isExterior = false;
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * Ray-casting point-in-polygon test
+ */
+export function pointInPolygon(px: number, py: number, verts: { x: number; y: number }[]): boolean {
+  let inside = false;
+  for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+    const xi = verts[i].x, yi = verts[i].y;
+    const xj = verts[j].x, yj = verts[j].y;
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
 }
 
 /**

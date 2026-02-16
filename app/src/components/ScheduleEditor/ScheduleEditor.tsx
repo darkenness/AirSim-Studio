@@ -5,6 +5,7 @@ import { useCanvasStore } from '../../store/useCanvasStore';
 import { Plus, Trash2, Clock, Copy } from 'lucide-react';
 import type { Schedule, SchedulePoint } from '../../types';
 import WeekScheduleEditor from './WeekScheduleEditor';
+import { EmptyState } from '../ui/empty-state';
 
 const PRESETS: { name: string; points: SchedulePoint[] }[] = [
   {
@@ -193,7 +194,7 @@ export default function ScheduleEditor() {
     const canvasState = useCanvasStore.getState();
     for (const story of canvasState.stories) {
       for (const p of story.placements) {
-        if (p.scheduleId === id) {
+        if (p.scheduleId !== undefined && Number(p.scheduleId) === id) {
           canvasState.updatePlacement(p.id, { scheduleId: undefined });
         }
       }
@@ -214,12 +215,12 @@ export default function ScheduleEditor() {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex border-b border-border">
+      <div className="flex gap-1 p-1 bg-muted rounded-lg">
         <button
           onClick={() => setActiveTab('schedules')}
-          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             activeTab === 'schedules'
-              ? 'text-primary border-b-2 border-primary'
+              ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -227,9 +228,9 @@ export default function ScheduleEditor() {
         </button>
         <button
           onClick={() => setActiveTab('week')}
-          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+          className={`flex-1 px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
             activeTab === 'week'
-              ? 'text-primary border-b-2 border-primary'
+              ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground hover:text-foreground'
           }`}
         >
@@ -248,7 +249,7 @@ export default function ScheduleEditor() {
           </div>
 
           {schedules.length === 0 && (
-            <p className="text-[10px] text-muted-foreground italic">尚未添加时间表。点击 + 添加。</p>
+            <EmptyState icon={Clock} message="尚未添加时间表" actionText="添加时间表" onAction={handleAdd} />
           )}
 
           {schedules.map((sch) => (

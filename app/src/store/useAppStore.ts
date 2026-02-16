@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { temporal } from 'zundo';
-import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, WeekSchedule, DayType, FilterConfig } from '../types';
+import type { AppState, ZoneNode, AirflowLink, TopologyJson, Species, Source, Schedule, TransientResult, Occupant, ControlSystem, AHSConfig, FilterConfig } from '../types';
 
 export const useAppStore = create<AppState>()(temporal((set, get) => ({
   // Model data

@@ -1,26 +1,8 @@
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, Filter, Layers } from 'lucide-react';
 import type { FilterConfig, LoadingPoint } from '../../types';
-
-function InputField({ label, value, onChange, unit, step }: {
-  label: string; value: number; onChange: (v: number) => void; unit?: string; step?: string;
-}) {
-  return (
-    <label className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
-      <div className="flex items-center gap-1">
-        <input
-          type="number"
-          value={value}
-          step={step ?? '0.001'}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-          className="flex-1 px-2 py-1 text-xs border border-border rounded-md focus:outline-none focus:ring-1 focus:ring-ring bg-background"
-        />
-        {unit && <span className="text-[10px] text-muted-foreground min-w-[28px]">{unit}</span>}
-      </div>
-    </label>
-  );
-}
+import { InputField } from '../ui/input-field';
+import { EmptyState } from '../ui/empty-state';
 
 function LoadingTableEditor({ points, onChange }: {
   points: LoadingPoint[];
@@ -41,7 +23,7 @@ function LoadingTableEditor({ points, onChange }: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">负载-效率曲线</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">负载-效率曲线</span>
         <button onClick={addPoint} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground">
           <Plus size={12} />
         </button>
@@ -72,7 +54,7 @@ function LoadingTableEditor({ points, onChange }: {
         </div>
       ))}
       {points.length === 0 && (
-        <span className="text-[10px] text-muted-foreground italic">无数据点</span>
+        <span className="text-[11px] text-muted-foreground italic">无数据点</span>
       )}
     </div>
   );
@@ -101,7 +83,7 @@ function ArrayEditor({ label, values, onChange, placeholder }: {
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center gap-1">
-        <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
         <button onClick={addValue} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground">
           <Plus size={12} />
         </button>
@@ -122,7 +104,7 @@ function ArrayEditor({ label, values, onChange, placeholder }: {
         </div>
       ))}
       {values.length === 0 && (
-        <span className="text-[10px] text-muted-foreground italic">无系数</span>
+        <span className="text-[11px] text-muted-foreground italic">无系数</span>
       )}
     </div>
   );
@@ -133,7 +115,7 @@ function SimpleGaseousFilterCard({ filter }: { filter: FilterConfig }) {
   if (filter.type !== 'SimpleGaseousFilter') return null;
 
   return (
-    <div className="flex flex-col gap-2 p-2 border border-border rounded-lg">
+    <div className="flex flex-col gap-2.5 p-4 border border-border rounded-lg">
       <div className="flex items-center gap-2">
         <Filter size={13} className="text-blue-500" />
         <input
@@ -150,14 +132,14 @@ function SimpleGaseousFilterCard({ filter }: { filter: FilterConfig }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <InputField label="流动系数 C" value={filter.flowCoefficient} step="0.0001"
-          onChange={(v) => updateFilterConfig(filter.id, { flowCoefficient: Math.max(0.0001, v) })} />
-        <InputField label="流动指数 n" value={filter.flowExponent} step="0.01"
-          onChange={(v) => updateFilterConfig(filter.id, { flowExponent: Math.max(0.5, Math.min(1.0, v)) })} />
+        <InputField label="流动系数 C" value={filter.flowCoefficient} type="number" step="0.0001"
+          onChange={(v) => updateFilterConfig(filter.id, { flowCoefficient: Math.max(0.0001, parseFloat(v) || 0) })} />
+        <InputField label="流动指数 n" value={filter.flowExponent} type="number" step="0.01"
+          onChange={(v) => updateFilterConfig(filter.id, { flowExponent: Math.max(0.5, Math.min(1.0, parseFloat(v) || 0)) })} />
       </div>
 
-      <InputField label="突破阈值" value={filter.breakthroughThreshold} step="0.01"
-        onChange={(v) => updateFilterConfig(filter.id, { breakthroughThreshold: Math.max(0, Math.min(1, v)) })} />
+      <InputField label="突破阈值" value={filter.breakthroughThreshold} type="number" step="0.01"
+        onChange={(v) => updateFilterConfig(filter.id, { breakthroughThreshold: Math.max(0, Math.min(1, parseFloat(v) || 0)) })} />
 
       <LoadingTableEditor
         points={filter.loadingTable}
@@ -172,7 +154,7 @@ function UVGIFilterCard({ filter }: { filter: FilterConfig }) {
   if (filter.type !== 'UVGIFilter') return null;
 
   return (
-    <div className="flex flex-col gap-2 p-2 border border-border rounded-lg">
+    <div className="flex flex-col gap-2.5 p-4 border border-border rounded-lg">
       <div className="flex items-center gap-2">
         <Filter size={13} className="text-purple-500" />
         <input
@@ -189,22 +171,22 @@ function UVGIFilterCard({ filter }: { filter: FilterConfig }) {
       </div>
 
       <div className="grid grid-cols-2 gap-2">
-        <InputField label="流动系数 C" value={filter.flowCoefficient} step="0.0001"
-          onChange={(v) => updateFilterConfig(filter.id, { flowCoefficient: Math.max(0.0001, v) })} />
-        <InputField label="流动指数 n" value={filter.flowExponent} step="0.01"
-          onChange={(v) => updateFilterConfig(filter.id, { flowExponent: Math.max(0.5, Math.min(1.0, v)) })} />
-        <InputField label="敏感系数 k" value={filter.susceptibility} unit="m²/J" step="0.001"
-          onChange={(v) => updateFilterConfig(filter.id, { susceptibility: Math.max(0, v) })} />
-        <InputField label="辐照度" value={filter.irradiance} unit="W/m²" step="1"
-          onChange={(v) => updateFilterConfig(filter.id, { irradiance: Math.max(0, v) })} />
-        <InputField label="腔体体积" value={filter.chamberVolume} unit="m³" step="0.01"
-          onChange={(v) => updateFilterConfig(filter.id, { chamberVolume: Math.max(0.001, v) })} />
-        <InputField label="老化率" value={filter.agingRate} unit="1/h" step="0.0001"
-          onChange={(v) => updateFilterConfig(filter.id, { agingRate: Math.max(0, v) })} />
+        <InputField label="流动系数 C" value={filter.flowCoefficient} type="number" step="0.0001"
+          onChange={(v) => updateFilterConfig(filter.id, { flowCoefficient: Math.max(0.0001, parseFloat(v) || 0) })} />
+        <InputField label="流动指数 n" value={filter.flowExponent} type="number" step="0.01"
+          onChange={(v) => updateFilterConfig(filter.id, { flowExponent: Math.max(0.5, Math.min(1.0, parseFloat(v) || 0)) })} />
+        <InputField label="敏感系数 k" value={filter.susceptibility} unit="m²/J" type="number" step="0.001"
+          onChange={(v) => updateFilterConfig(filter.id, { susceptibility: Math.max(0, parseFloat(v) || 0) })} />
+        <InputField label="辐照度" value={filter.irradiance} unit="W/m²" type="number" step="1"
+          onChange={(v) => updateFilterConfig(filter.id, { irradiance: Math.max(0, parseFloat(v) || 0) })} />
+        <InputField label="腔体体积" value={filter.chamberVolume} unit="m³" type="number" step="0.01"
+          onChange={(v) => updateFilterConfig(filter.id, { chamberVolume: Math.max(0.001, parseFloat(v) || 0) })} />
+        <InputField label="老化率" value={filter.agingRate} unit="1/h" type="number" step="0.0001"
+          onChange={(v) => updateFilterConfig(filter.id, { agingRate: Math.max(0, parseFloat(v) || 0) })} />
       </div>
 
-      <InputField label="灯管使用时长" value={filter.lampAgeHours} unit="h" step="1"
-        onChange={(v) => updateFilterConfig(filter.id, { lampAgeHours: Math.max(0, v) })} />
+      <InputField label="灯管使用时长" value={filter.lampAgeHours} unit="h" type="number" step="1"
+        onChange={(v) => updateFilterConfig(filter.id, { lampAgeHours: Math.max(0, parseFloat(v) || 0) })} />
 
       <ArrayEditor
         label="温度系数 [a0, a1, a2, a3]"
@@ -250,7 +232,7 @@ function SuperFilterCard({ filter }: { filter: FilterConfig }) {
   };
 
   return (
-    <div className="flex flex-col gap-2 p-2 border border-border rounded-lg">
+    <div className="flex flex-col gap-2.5 p-4 border border-border rounded-lg">
       <div className="flex items-center gap-2">
         <Layers size={13} className="text-emerald-500" />
         <input
@@ -266,12 +248,12 @@ function SuperFilterCard({ filter }: { filter: FilterConfig }) {
         </button>
       </div>
 
-      <InputField label="负载衰减率" value={filter.loadingDecayRate} step="0.01"
-        onChange={(v) => updateFilterConfig(filter.id, { loadingDecayRate: Math.max(0, v) })} />
+      <InputField label="负载衰减率" value={filter.loadingDecayRate} type="number" step="0.01"
+        onChange={(v) => updateFilterConfig(filter.id, { loadingDecayRate: Math.max(0, parseFloat(v) || 0) })} />
 
       <div className="flex flex-col gap-1">
         <div className="flex items-center gap-1">
-          <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">级联阶段</span>
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">级联阶段</span>
           <button onClick={addStage} className="ml-auto p-0.5 rounded hover:bg-accent text-muted-foreground">
             <Plus size={12} />
           </button>
@@ -294,7 +276,7 @@ function SuperFilterCard({ filter }: { filter: FilterConfig }) {
           </div>
         ))}
         {filter.stages.length === 0 && (
-          <span className="text-[10px] text-muted-foreground italic">无阶段</span>
+          <span className="text-[11px] text-muted-foreground italic">无阶段</span>
         )}
       </div>
     </div>
@@ -344,28 +326,28 @@ export default function FilterPanel() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
         <Filter size={14} className="text-blue-500" />
         <span className="text-xs font-bold text-foreground">过滤器配置</span>
-        <div className="ml-auto flex gap-1">
+        <div className="ml-auto flex gap-1.5">
           <button
             onClick={() => handleAdd('SimpleGaseousFilter')}
-            className="px-2 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors"
+            className="px-2.5 py-1 text-xs font-medium bg-background hover:bg-accent text-foreground rounded-md border border-border transition-colors"
             title="添加气体过滤器"
           >
             + 气体
           </button>
           <button
             onClick={() => handleAdd('UVGIFilter')}
-            className="px-2 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors"
+            className="px-2.5 py-1 text-xs font-medium bg-background hover:bg-accent text-foreground rounded-md border border-border transition-colors"
             title="添加UVGI过滤器"
           >
             + UVGI
           </button>
           <button
             onClick={() => handleAdd('SuperFilter')}
-            className="px-2 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors"
+            className="px-2.5 py-1 text-xs font-medium bg-background hover:bg-accent text-foreground rounded-md border border-border transition-colors"
             title="添加超级过滤器"
           >
             + 超级
@@ -374,9 +356,7 @@ export default function FilterPanel() {
       </div>
 
       {filterConfigs.length === 0 && (
-        <p className="text-xs text-muted-foreground italic">
-          尚未添加过滤器。点击上方按钮创建气体过滤器、UVGI过滤器或超级过滤器。
-        </p>
+        <EmptyState icon={Filter} message="尚未添加过滤器" />
       )}
 
       {filterConfigs.map((filter) => {

@@ -51,21 +51,42 @@ export function constrainOrthogonal(
   geo: Geometry,
   snapThreshold: number, // world units
 ): OrthoResult {
-  // 1. Vertex snapping — always wins (enables room closure)
-  const snapCandidate = findNearestVertex(geo, mouseWX, mouseWY, snapThreshold);
-  if (snapCandidate) {
-    return { x: snapCandidate.x, y: snapCandidate.y, snappedVertexId: snapCandidate.id };
-  }
-
-  // 2. Orthogonal constraint: pick axis with larger delta
+  // 1. Orthogonal constraint: pick axis with larger delta
   const dx = Math.abs(mouseWX - startX);
   const dy = Math.abs(mouseWY - startY);
 
-  if (dx >= dy) {
-    // Horizontal wall: lock Y
+  const isHorizontal = dx >= dy;
+  const orthoX = isHorizontal ? mouseWX : startX;
+  const orthoY = isHorizontal ? startY : mouseWY;
+
+  // 2. Vertex snapping — only if the snapped vertex is on the same orthogonal axis
+  const snapCandidate = findNearestVertex(geo, orthoX, orthoY, snapThreshold);
+  if (snapCandidate) {
+    // Check if snap target aligns with orthogonal constraint
+    const snapDx = Math.abs(snapCandidate.x - startX);
+    const snapDy = Math.abs(snapCandidate.y - startY);
+    if (isHorizontal && snapDy < 0.05) {
+      // Horizontal wall: snap target shares Y axis
+      return { x: snapCandidate.x, y: startY, snappedVertexId: snapCandidate.id };
+    } else if (!isHorizontal && snapDx < 0.05) {
+      // Vertical wall: snap target shares X axis
+      return { x: startX, y: snapCandidate.y, snappedVertexId: snapCandidate.id };
+    }
+    // Also allow snapping to the start vertex's exact position (for closing loops)
+    const distToStart = Math.sqrt((snapCandidate.x - startX) ** 2 + (snapCandidate.y - startY) ** 2);
+    if (distToStart < 0.05) {
+      return { x: snapCandidate.x, y: snapCandidate.y, snappedVertexId: snapCandidate.id };
+    }
+    // Check if snap target is at a corner (shares either X or Y with start)
+    if (snapDx < 0.05 || snapDy < 0.05) {
+      return { x: snapCandidate.x, y: snapCandidate.y, snappedVertexId: snapCandidate.id };
+    }
+  }
+
+  // 3. Grid snap on the constrained axis
+  if (isHorizontal) {
     return { x: snapToGrid(mouseWX, gridSize), y: startY, snappedVertexId: null };
   } else {
-    // Vertical wall: lock X
     return { x: startX, y: snapToGrid(mouseWY, gridSize), snappedVertexId: null };
   }
 }
@@ -205,6 +226,122 @@ export function computeAlphaOnEdge(
 
   const t = ((wx - v1.x) * dx + (wy - v1.y) * dy) / len2;
   return Math.max(0.05, Math.min(0.95, t));
+}
+
+// ── Box hit-testing (for drag-select erase) ──
+
+/**
+ * Return IDs of all edges that intersect or are fully inside the given
+ * world-coordinate rectangle (x1,y1)–(x2,y2).
+ */
+export function boxHitTestEdges(
+  geo: Geometry,
+  x1: number, y1: number,
+  x2: number, y2: number,
+): string[] {
+  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+  const vertexMap = buildVertexMap(geo);
+  const result: string[] = [];
+
+  for (const edge of geo.edges) {
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
+    if (!v1 || !v2) continue;
+
+    // If either endpoint is inside the box, the edge intersects
+    if (pointInBox(v1.x, v1.y, minX, minY, maxX, maxY) ||
+        pointInBox(v2.x, v2.y, minX, minY, maxX, maxY)) {
+      result.push(edge.id);
+      continue;
+    }
+
+    // Check if the segment crosses any of the 4 box edges
+    if (segmentIntersectsBox(v1.x, v1.y, v2.x, v2.y, minX, minY, maxX, maxY)) {
+      result.push(edge.id);
+    }
+  }
+  return result;
+}
+
+/**
+ * Return IDs of all placements whose position falls inside the given
+ * world-coordinate rectangle.
+ */
+export function boxHitTestPlacements(
+  geo: Geometry,
+  placements: import('../model/geometry').EdgePlacement[],
+  x1: number, y1: number,
+  x2: number, y2: number,
+): string[] {
+  const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+  const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+  const vertexMap = buildVertexMap(geo);
+  const edgeMap = buildEdgeMap(geo);
+  const result: string[] = [];
+
+  for (const pl of placements) {
+    const edge = edgeMap.get(pl.edgeId);
+    if (!edge) continue;
+    const v1 = vertexMap.get(edge.vertexIds[0]);
+    const v2 = vertexMap.get(edge.vertexIds[1]);
+    if (!v1 || !v2) continue;
+
+    const px = v1.x + (v2.x - v1.x) * pl.alpha;
+    const py = v1.y + (v2.y - v1.y) * pl.alpha;
+    if (pointInBox(px, py, minX, minY, maxX, maxY)) {
+      result.push(pl.id);
+    }
+  }
+  return result;
+}
+
+function pointInBox(px: number, py: number, minX: number, minY: number, maxX: number, maxY: number): boolean {
+  return px >= minX && px <= maxX && py >= minY && py <= maxY;
+}
+
+/** Check if segment (ax,ay)-(bx,by) intersects the axis-aligned box */
+function segmentIntersectsBox(
+  ax: number, ay: number, bx: number, by: number,
+  minX: number, minY: number, maxX: number, maxY: number,
+): boolean {
+  // Cohen-Sutherland style: test segment against each box edge
+  return (
+    segmentsIntersect(ax, ay, bx, by, minX, minY, maxX, minY) ||
+    segmentsIntersect(ax, ay, bx, by, maxX, minY, maxX, maxY) ||
+    segmentsIntersect(ax, ay, bx, by, maxX, maxY, minX, maxY) ||
+    segmentsIntersect(ax, ay, bx, by, minX, maxY, minX, minY)
+  );
+}
+
+/** Check if two line segments intersect */
+function segmentsIntersect(
+  ax: number, ay: number, bx: number, by: number,
+  cx: number, cy: number, dx: number, dy: number,
+): boolean {
+  const d1 = cross(cx, cy, dx, dy, ax, ay);
+  const d2 = cross(cx, cy, dx, dy, bx, by);
+  const d3 = cross(ax, ay, bx, by, cx, cy);
+  const d4 = cross(ax, ay, bx, by, dx, dy);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+      ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+    return true;
+  }
+  // Collinear cases
+  if (d1 === 0 && onSegment(cx, cy, dx, dy, ax, ay)) return true;
+  if (d2 === 0 && onSegment(cx, cy, dx, dy, bx, by)) return true;
+  if (d3 === 0 && onSegment(ax, ay, bx, by, cx, cy)) return true;
+  if (d4 === 0 && onSegment(ax, ay, bx, by, dx, dy)) return true;
+  return false;
+}
+
+function cross(ax: number, ay: number, bx: number, by: number, cx: number, cy: number): number {
+  return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+}
+
+function onSegment(ax: number, ay: number, bx: number, by: number, px: number, py: number): boolean {
+  return Math.min(ax, bx) <= px && px <= Math.max(ax, bx) &&
+         Math.min(ay, by) <= py && py <= Math.max(ay, by);
 }
 
 // ── Geometry helpers ──

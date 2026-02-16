@@ -5,7 +5,7 @@
 
 import type { Camera2D } from './camera2d';
 import type { Geometry, GeoVertex, GeoEdge, EdgePlacement, ZoneAssignment } from '../model/geometry';
-import { faceArea, edgeLength, getFaceVertices } from '../model/geometry';
+import { faceArea, edgeLength, getFaceVertices, pointInPolygon } from '../model/geometry';
 
 // ── Lookup maps for O(1) vertex/edge access in hot paths ──
 
@@ -49,9 +49,9 @@ export function readThemeColors(): ThemeColors {
   };
 }
 
-// ── Hand-drawn (Excalidraw-style) rendering helpers ──
+// ── Clean rendering helpers ──
 
-/** Simple seeded PRNG based on string hash — consistent wobble per element */
+/** Simple seeded hash from string — used for stable per-element seeds */
 function seedFromId(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) {
@@ -60,92 +60,52 @@ function seedFromId(id: string): number {
   return h;
 }
 
-function seededRandom(seed: number, index: number): number {
-  const x = Math.sin(seed * 9301 + index * 49297 + 233280) * 49297;
-  return x - Math.floor(x);
-}
-
 /** Amplitude of hand-drawn wobble in screen pixels */
-const ROUGH_AMP = 1.2;
+const ROUGH_AMP = 0;
 
 /**
- * Draw a rough (hand-drawn) line from (x1,y1) to (x2,y2) in screen coords.
- * Splits the segment into sub-segments with slight perpendicular offsets.
+ * Draw a straight line from (x1,y1) to (x2,y2) in screen coords.
  */
 function roughLine(
   ctx: CanvasRenderingContext2D,
   x1: number, y1: number,
   x2: number, y2: number,
-  seed: number,
-  amp: number = ROUGH_AMP,
+  _seed: number,
+  _amp: number = ROUGH_AMP,
 ): void {
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.sqrt(dx * dx + dy * dy);
-  if (len < 2) {
-    ctx.lineTo(x2, y2);
-    return;
-  }
-  // Normal direction for perpendicular offsets
-  const nx = -dy / len;
-  const ny = dx / len;
-  const segments = Math.max(2, Math.ceil(len / 20));
-
-  ctx.moveTo(x1 + (seededRandom(seed, 0) - 0.5) * amp * 0.5,
-             y1 + (seededRandom(seed, 1) - 0.5) * amp * 0.5);
-  for (let i = 1; i <= segments; i++) {
-    const t = i / segments;
-    const px = x1 + dx * t;
-    const py = y1 + dy * t;
-    const offset = (seededRandom(seed, i * 2) - 0.5) * amp * 2;
-    // Last point snaps to endpoint
-    if (i === segments) {
-      ctx.lineTo(x2 + (seededRandom(seed, 99) - 0.5) * amp * 0.3,
-                 y2 + (seededRandom(seed, 100) - 0.5) * amp * 0.3);
-    } else {
-      ctx.lineTo(px + nx * offset, py + ny * offset);
-    }
-  }
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
 }
 
 /**
- * Draw a rough polygon path (closed) from screen-space points.
+ * Draw a polygon path (closed) from screen-space points.
  */
 function roughPolygon(
   ctx: CanvasRenderingContext2D,
   points: { x: number; y: number }[],
-  seed: number,
-  amp: number = ROUGH_AMP,
+  _seed: number,
+  _amp: number = ROUGH_AMP,
 ): void {
   if (points.length < 2) return;
   ctx.beginPath();
   ctx.moveTo(points[0].x, points[0].y);
-  for (let i = 0; i < points.length; i++) {
-    const next = points[(i + 1) % points.length];
-    roughLine(ctx, points[i].x, points[i].y, next.x, next.y, seed + i * 7, amp);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
   }
   ctx.closePath();
 }
 
 /**
- * Draw a rough circle (approximated by polygon segments).
+ * Draw a circle.
  */
 function roughCircle(
   ctx: CanvasRenderingContext2D,
   cx: number, cy: number, r: number,
-  seed: number,
-  amp: number = ROUGH_AMP,
+  _seed: number,
+  _amp: number = ROUGH_AMP,
 ): void {
-  const n = 12;
   ctx.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const angle = (i / n) * Math.PI * 2;
-    const wobble = 1 + (seededRandom(seed, i) - 0.5) * (amp / r) * 0.5;
-    const px = cx + Math.cos(angle) * r * wobble;
-    const py = cy + Math.sin(angle) * r * wobble;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
-  }
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
   ctx.closePath();
 }
 
@@ -216,6 +176,79 @@ export function drawDotGrid(
 
 // ── Zone fills (semi-transparent polygons) ──
 
+/**
+ * Find the best interior point for a label inside a polygon.
+ * Uses pole-of-inaccessibility approximation: sample grid points inside the polygon
+ * and pick the one farthest from all edges (and not inside any other face).
+ */
+function findLabelPoint(
+  verts: { x: number; y: number }[],
+  otherFaces: Array<{ x: number; y: number }[]>,
+): { x: number; y: number; inside: boolean } {
+  // Bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const v of verts) {
+    if (v.x < minX) minX = v.x;
+    if (v.y < minY) minY = v.y;
+    if (v.x > maxX) maxX = v.x;
+    if (v.y > maxY) maxY = v.y;
+  }
+
+  // Simple centroid
+  const cx = verts.reduce((s, v) => s + v.x, 0) / verts.length;
+  const cy = verts.reduce((s, v) => s + v.y, 0) / verts.length;
+
+  // Check if centroid is valid (inside this face, not inside any other face)
+  const centroidValid = pointInPolygon(cx, cy, verts) &&
+    !otherFaces.some(f => pointInPolygon(cx, cy, f));
+  if (centroidValid) return { x: cx, y: cy, inside: true };
+
+  // Grid sampling: find point with max distance to nearest edge
+  const GRID = 8;
+  const stepX = (maxX - minX) / (GRID + 1);
+  const stepY = (maxY - minY) / (GRID + 1);
+
+  let bestX = cx, bestY = cy, bestDist = -1;
+  let foundAny = false;
+
+  for (let gi = 1; gi <= GRID; gi++) {
+    for (let gj = 1; gj <= GRID; gj++) {
+      const px = minX + gi * stepX;
+      const py = minY + gj * stepY;
+
+      if (!pointInPolygon(px, py, verts)) continue;
+      if (otherFaces.some(f => pointInPolygon(px, py, f))) continue;
+
+      // Min distance to any edge of this polygon
+      let minEdgeDist = Infinity;
+      for (let i = 0; i < verts.length; i++) {
+        const j = (i + 1) % verts.length;
+        const d = pointToSegmentDist(px, py, verts[i].x, verts[i].y, verts[j].x, verts[j].y);
+        if (d < minEdgeDist) minEdgeDist = d;
+      }
+
+      if (minEdgeDist > bestDist) {
+        bestDist = minEdgeDist;
+        bestX = px;
+        bestY = py;
+        foundAny = true;
+      }
+    }
+  }
+
+  return { x: bestX, y: bestY, inside: foundAny };
+}
+
+/** Distance from point to line segment */
+function pointToSegmentDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const dx = bx - ax, dy = by - ay;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 1e-10) return Math.sqrt((px - ax) ** 2 + (py - ay) ** 2);
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / lenSq));
+  const projX = ax + t * dx, projY = ay + t * dy;
+  return Math.sqrt((px - projX) ** 2 + (py - projY) ** 2);
+}
+
 export function drawZones(
   ctx: CanvasRenderingContext2D,
   geo: Geometry,
@@ -229,13 +262,19 @@ export function drawZones(
   const cx = canvasW / 2;
   const cy = canvasH / 2;
 
+  // Pre-build all face vertex lists (world coords) for cross-face checks
+  const allFaceVerts: Map<string, { x: number; y: number }[]> = new Map();
+  for (const face of geo.faces) {
+    const verts = getFaceVertices(geo, face);
+    if (verts.length >= 3) allFaceVerts.set(face.id, verts);
+  }
+
   for (const face of geo.faces) {
     const zone = zones.find(z => z.faceId === face.id);
     if (!zone) continue;
 
-    // Build ordered vertex list for the face polygon
-    const verts = getFaceVertices(geo, face);
-    if (verts.length < 3) continue;
+    const verts = allFaceVerts.get(face.id);
+    if (!verts) continue;
 
     // Convert to screen coords
     const screenPts = verts.map(v => ({
@@ -250,18 +289,73 @@ export function drawZones(
     ctx.globalAlpha = face.id === selectedFaceId ? 0.4 : face.id === hoveredFaceId ? 0.45 : 0.2;
     ctx.fill();
 
-    // Label
+    // Label — smart placement avoiding nested faces
     ctx.globalAlpha = 1.0;
     if (camera.zoom > 15) {
-      const centroid = getCentroid(verts);
-      const sx = centroid.x * camera.zoom + camera.panX + cx;
-      const sy = centroid.y * camera.zoom + camera.panY + cy;
+      // Collect other faces' vertices for exclusion
+      const otherFaces: { x: number; y: number }[][] = [];
+      for (const [fid, fv] of allFaceVerts) {
+        if (fid !== face.id) otherFaces.push(fv);
+      }
+
+      const labelPt = findLabelPoint(verts, otherFaces);
+      const sx = labelPt.x * camera.zoom + camera.panX + cx;
+      const sy = labelPt.y * camera.zoom + camera.panY + cy;
       const fontSize = Math.max(10, Math.min(14, camera.zoom * 0.25));
       ctx.font = `${fontSize}px 'DM Sans', system-ui`;
-      ctx.fillStyle = colors.foreground;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(zone.name, sx, sy);
+
+      // Check if label fits inside the face (area-based heuristic)
+      const area = faceArea(geo, face);
+      const labelW = ctx.measureText(zone.name).width;
+      const labelAreaNeeded = (labelW / camera.zoom) * (fontSize / camera.zoom);
+      const tooSmall = area < labelAreaNeeded * 1.5;
+
+      if (tooSmall && !labelPt.inside) {
+        // Face too small: draw leader line from centroid to offset label
+        const centroid = getCentroid(verts);
+        const csx = centroid.x * camera.zoom + camera.panX + cx;
+        const csy = centroid.y * camera.zoom + camera.panY + cy;
+        const offsetDist = Math.max(30, camera.zoom * 0.8);
+        const lx = csx + offsetDist;
+        const ly = csy - offsetDist;
+
+        // Leader line
+        ctx.strokeStyle = colors.foreground;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.moveTo(csx, csy);
+        ctx.lineTo(lx, ly);
+        ctx.stroke();
+
+        // Small dot at centroid
+        ctx.fillStyle = colors.foreground;
+        ctx.globalAlpha = 0.5;
+        ctx.beginPath();
+        ctx.arc(csx, csy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Label at end of leader
+        ctx.globalAlpha = 0.9;
+        const bgW = labelW + 8;
+        const bgH = fontSize + 6;
+        ctx.fillStyle = colors.background;
+        ctx.fillRect(lx - bgW / 2, ly - bgH / 2, bgW, bgH);
+        ctx.fillStyle = colors.foreground;
+        ctx.fillText(zone.name, lx, ly);
+      } else {
+        // Normal label with background pill
+        const bgW = labelW + 8;
+        const bgH = fontSize + 6;
+        ctx.fillStyle = colors.background;
+        ctx.globalAlpha = 0.7;
+        ctx.fillRect(sx - bgW / 2, sy - bgH / 2, bgW, bgH);
+        ctx.fillStyle = colors.foreground;
+        ctx.globalAlpha = 1.0;
+        ctx.fillText(zone.name, sx, sy);
+      }
     }
     ctx.globalAlpha = 1.0;
   }
@@ -594,10 +688,23 @@ export function drawWallPreview(
     const midSy = (sy1 + sy2) / 2;
     const fontSize = Math.max(10, Math.min(13, camera.zoom * 0.2));
     ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = colors.primary;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`${len.toFixed(2)}m`, midSx, midSy - 4);
+
+    const label = `${len.toFixed(2)}m`;
+    const metrics = ctx.measureText(label);
+    const tw = metrics.width + 6;
+    const th = fontSize + 4;
+
+    // Background pill
+    ctx.fillStyle = colors.background;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(midSx - tw / 2, midSy - 4 - th, tw, th);
+
+    // Text
+    ctx.fillStyle = colors.foreground;
+    ctx.globalAlpha = 1.0;
+    ctx.fillText(label, midSx, midSy - 4);
   }
 }
 
@@ -641,15 +748,37 @@ export function drawRectPreview(
   if (w > 0.1 && h > 0.1 && camera.zoom > 3) {
     const fontSize = Math.max(10, Math.min(13, camera.zoom * 0.2));
     ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = colors.primary;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
+
+    // Width label (top)
+    const wLabel = `${w.toFixed(2)}m`;
     const midTop = (sx1 + sx2) / 2;
-    ctx.fillText(`${w.toFixed(2)}m`, midTop, Math.min(sy1, sy2) - 4);
+    const wMetrics = ctx.measureText(wLabel);
+    const wtw = wMetrics.width + 6;
+    const wth = fontSize + 4;
+    const wly = Math.min(sy1, sy2) - 4;
+    ctx.fillStyle = colors.background;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(midTop - wtw / 2, wly - wth, wtw, wth);
+    ctx.fillStyle = colors.foreground;
+    ctx.globalAlpha = 1.0;
+    ctx.fillText(wLabel, midTop, wly);
+
+    // Height label (left, rotated)
+    const hLabel = `${h.toFixed(2)}m`;
+    const hMetrics = ctx.measureText(hLabel);
+    const htw = hMetrics.width + 6;
+    const hth = fontSize + 4;
     ctx.save();
     ctx.translate(Math.min(sx1, sx2) - 4, (sy1 + sy2) / 2);
     ctx.rotate(-Math.PI / 2);
-    ctx.fillText(`${h.toFixed(2)}m`, 0, 0);
+    ctx.fillStyle = colors.background;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(-htw / 2, -hth, htw, hth);
+    ctx.fillStyle = colors.foreground;
+    ctx.globalAlpha = 1.0;
+    ctx.fillText(hLabel, 0, 0);
     ctx.restore();
   }
 }
@@ -1020,10 +1149,8 @@ export function drawWallDimensions(
   const fontSize = Math.max(9, Math.min(12, camera.zoom * 0.16));
 
   ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
-  ctx.fillStyle = colors.muted;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.globalAlpha = 0.75;
 
   for (const edge of geo.edges) {
     const v1 = vertexMap.get(edge.vertexIds[0]);
@@ -1053,7 +1180,21 @@ export function drawWallDimensions(
     const ny = elen > 0 ? edx / elen : 0;
     const offset = Math.max(8, camera.zoom * 0.15);
 
-    ctx.fillText(label, midX + nx * offset, midY + ny * offset);
+    const lx = midX + nx * offset;
+    const ly = midY + ny * offset;
+
+    // Background pill for readability
+    const metrics = ctx.measureText(label);
+    const tw = metrics.width + 6;
+    const th = fontSize + 4;
+    ctx.fillStyle = colors.background;
+    ctx.globalAlpha = 0.85;
+    ctx.fillRect(lx - tw / 2, ly - th, tw, th);
+
+    // Text
+    ctx.fillStyle = colors.foreground;
+    ctx.globalAlpha = 0.85;
+    ctx.fillText(label, lx, ly - 2);
   }
 
   ctx.globalAlpha = 1.0;
@@ -1089,11 +1230,24 @@ export function drawZoneAreaLabels(
 
     const fontSize = Math.max(8, Math.min(11, camera.zoom * 0.18));
     ctx.font = `${fontSize}px 'JetBrains Mono', monospace`;
-    ctx.fillStyle = colors.muted;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.globalAlpha = 0.65;
-    ctx.fillText(`${area.toFixed(1)} m²`, sx, sy + fontSize * 0.8);
+
+    const label = `${area.toFixed(1)} m²`;
+    const ly = sy + fontSize * 0.8;
+    const metrics = ctx.measureText(label);
+    const tw = metrics.width + 6;
+    const th = fontSize + 4;
+
+    // Background pill
+    ctx.fillStyle = colors.background;
+    ctx.globalAlpha = 0.75;
+    ctx.fillRect(sx - tw / 2, ly - 1, tw, th);
+
+    // Text
+    ctx.fillStyle = colors.foreground;
+    ctx.globalAlpha = 0.7;
+    ctx.fillText(label, sx, ly);
     ctx.globalAlpha = 1.0;
   }
 }
@@ -1270,6 +1424,41 @@ export function drawEraseHighlight(
     ctx.fill();
     ctx.globalAlpha = 1.0;
   }
+}
+
+// ── Erase box (drag-select rectangle for batch deletion) ──
+
+export function drawEraseBox(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  camera: Camera2D,
+  canvasW: number, canvasH: number,
+): void {
+  const cx = canvasW / 2;
+  const cy = canvasH / 2;
+  const sx1 = x1 * camera.zoom + camera.panX + cx;
+  const sy1 = y1 * camera.zoom + camera.panY + cy;
+  const sx2 = x2 * camera.zoom + camera.panX + cx;
+  const sy2 = y2 * camera.zoom + camera.panY + cy;
+
+  const left = Math.min(sx1, sx2);
+  const top = Math.min(sy1, sy2);
+  const w = Math.abs(sx2 - sx1);
+  const h = Math.abs(sy2 - sy1);
+
+  // Semi-transparent red fill
+  ctx.fillStyle = 'rgba(239, 68, 68, 0.1)';
+  ctx.fillRect(left, top, w, h);
+
+  // Red dashed border
+  ctx.setLineDash([6, 4]);
+  ctx.strokeStyle = '#ef4444';
+  ctx.lineWidth = 1.5;
+  ctx.globalAlpha = 0.8;
+  ctx.strokeRect(left, top, w, h);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1.0;
 }
 
 // ── M-06: Ghost rendering of adjacent floor geometry ──

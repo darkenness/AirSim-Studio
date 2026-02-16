@@ -9,11 +9,12 @@ import {
 import { Button } from '../ui/button';
 import {
   Search, Download, Upload, Eye, Wind, Fan, Filter, Clock,
-  Check, Package, Trash2,
+  Check, Package, Trash2, Inbox,
 } from 'lucide-react';
 import type {
   FlowElementDef, FilterConfig, Schedule,
 } from '../../types';
+import { EmptyState } from '../ui/empty-state';
 
 // ── Library data types ──────────────────────────────────────────────
 
@@ -461,11 +462,12 @@ export default function LibraryManager() {
         {(Object.keys(CATEGORY_META) as LibraryCategory[]).map(cat => (
           <TabsContent key={cat} value={cat} className="mt-2 flex flex-col gap-1.5 max-h-[360px] overflow-y-auto">
             {filteredItems.length === 0 ? (
-              <p className="text-[10px] text-muted-foreground italic py-4 text-center">
-                {mode === 'export'
+              <EmptyState
+                icon={Inbox}
+                message={mode === 'export'
                   ? `当前项目中没有${CATEGORY_META[cat].label}`
                   : '请先加载库文件'}
-              </p>
+              />
             ) : (
               filteredItems.map(item => (
                 <LibraryItemCard

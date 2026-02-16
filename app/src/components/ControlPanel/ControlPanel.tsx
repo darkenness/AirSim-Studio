@@ -1,6 +1,7 @@
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, Activity, Gauge, Radio } from 'lucide-react';
 import type { SensorDef, ControllerDef, ActuatorDef } from '../../types';
+import { EmptyState } from '../ui/empty-state';
 
 const SENSOR_TYPES = [
   { value: 'Concentration', label: '浓度' },
@@ -45,19 +46,19 @@ export default function ControlPanel() {
   }]);
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       {/* Sensors */}
-      <div className="border border-border rounded-md p-2 bg-card">
-        <div className="flex items-center gap-1 mb-1">
+      <div className="border border-border rounded-md p-4 bg-card">
+        <div className="flex items-center gap-2 mb-3">
           <Radio size={12} className="text-green-500" />
           <span className="text-xs font-semibold text-foreground">传感器</span>
           <button onClick={addSensor} className="ml-auto p-0.5 rounded hover:bg-green-500/10 text-muted-foreground hover:text-green-500">
             <Plus size={13} />
           </button>
         </div>
-        {sensors.length === 0 && <p className="text-xs text-muted-foreground italic">无传感器</p>}
+        {sensors.length === 0 && <EmptyState icon={Radio} message="无传感器" actionText="添加传感器" onAction={addSensor} />}
         {sensors.map(s => (
-          <div key={s.id} className="flex flex-col gap-0.5 py-1.5 border-t border-border text-xs">
+          <div key={s.id} className="flex flex-col gap-2 py-2.5 border-t border-border text-xs">
             <div className="flex items-center gap-1">
               <input value={s.name} onChange={e => updateSensors(arr => arr.map(x => x.id === s.id ? { ...x, name: e.target.value } : x))}
                 className="flex-1 px-1.5 py-0.5 border border-border rounded text-xs bg-background" />
@@ -79,17 +80,17 @@ export default function ControlPanel() {
       </div>
 
       {/* Actuators */}
-      <div className="border border-border rounded-md p-2 bg-card">
-        <div className="flex items-center gap-1 mb-1">
+      <div className="border border-border rounded-md p-4 bg-card">
+        <div className="flex items-center gap-2 mb-3">
           <Gauge size={12} className="text-orange-500" />
           <span className="text-xs font-semibold text-foreground">执行器</span>
           <button onClick={addActuator} className="ml-auto p-0.5 rounded hover:bg-orange-500/10 text-muted-foreground hover:text-orange-500">
             <Plus size={13} />
           </button>
         </div>
-        {actuators.length === 0 && <p className="text-xs text-muted-foreground italic">无执行器</p>}
+        {actuators.length === 0 && <EmptyState icon={Gauge} message="无执行器" actionText="添加执行器" onAction={addActuator} />}
         {actuators.map(a => (
-          <div key={a.id} className="flex flex-col gap-0.5 py-1.5 border-t border-border text-xs">
+          <div key={a.id} className="flex flex-col gap-2 py-2.5 border-t border-border text-xs">
             <div className="flex items-center gap-1">
               <input value={a.name} onChange={e => updateActuators(arr => arr.map(x => x.id === a.id ? { ...x, name: e.target.value } : x))}
                 className="flex-1 px-1.5 py-0.5 border border-border rounded text-xs bg-background" />
@@ -111,24 +112,24 @@ export default function ControlPanel() {
       </div>
 
       {/* Controllers */}
-      <div className="border border-border rounded-md p-2 bg-card">
-        <div className="flex items-center gap-1 mb-1">
+      <div className="border border-border rounded-md p-4 bg-card">
+        <div className="flex items-center gap-2 mb-3">
           <Activity size={12} className="text-violet-500" />
           <span className="text-xs font-semibold text-foreground">控制器 (PI)</span>
           <button onClick={addController} className="ml-auto p-0.5 rounded hover:bg-violet-500/10 text-muted-foreground hover:text-violet-500">
             <Plus size={13} />
           </button>
         </div>
-        {controllers.length === 0 && <p className="text-xs text-muted-foreground italic">无控制器</p>}
+        {controllers.length === 0 && <EmptyState icon={Activity} message="无控制器" actionText="添加控制器" onAction={addController} />}
         {controllers.map(c => (
-          <div key={c.id} className="flex flex-col gap-1 py-1.5 border-t border-border text-xs">
+          <div key={c.id} className="flex flex-col gap-2 py-2.5 border-t border-border text-xs">
             <div className="flex items-center gap-1">
               <input value={c.name} onChange={e => updateControllers(arr => arr.map(x => x.id === c.id ? { ...x, name: e.target.value } : x))}
                 className="flex-1 px-1.5 py-0.5 border border-border rounded text-xs bg-background" />
               <button onClick={() => updateControllers(arr => arr.filter(x => x.id !== c.id))}
                 className="p-0.5 text-muted-foreground hover:text-destructive"><Trash2 size={11} /></button>
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1.5">
               <label className="flex flex-col flex-1">
                 <span className="text-[10px] text-muted-foreground">传感器</span>
                 <select value={c.sensorId} onChange={e => updateControllers(arr => arr.map(x => x.id === c.id ? { ...x, sensorId: parseInt(e.target.value) } : x))}
@@ -144,7 +145,7 @@ export default function ControlPanel() {
                 </select>
               </label>
             </div>
-            <div className="grid grid-cols-4 gap-1">
+            <div className="grid grid-cols-4 gap-1.5">
               {[
                 { key: 'setpoint', label: '设定值', step: '0.001' },
                 { key: 'Kp', label: 'Kp', step: '0.1' },

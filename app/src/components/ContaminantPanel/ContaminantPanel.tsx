@@ -1,8 +1,8 @@
 import { useAppStore } from '../../store/useAppStore';
 import { Plus, Trash2, FlaskConical, Flame, Clock } from 'lucide-react';
 import { useMergedRooms } from '../../hooks/useMergedRooms';
-
 import { InputField } from '../ui/input-field';
+import { EmptyState } from '../ui/empty-state';
 
 const POLLUTANT_TEMPLATES: { name: string; molarMass: number; decayRate: number; outdoorConc: number; label: string }[] = [
   { name: 'CO',   molarMass: 0.028, decayRate: 0,      outdoorConc: 0,       label: '一氧化碳' },
@@ -56,13 +56,13 @@ function SpeciesSection() {
       </div>
 
       {/* Quick-add templates */}
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1.5">
         {POLLUTANT_TEMPLATES.map((tpl) => (
           <button
             key={tpl.name}
             onClick={() => handleAddTemplate(tpl)}
             title={tpl.label}
-            className="px-1.5 py-0.5 text-[10px] bg-accent hover:bg-primary/10 text-accent-foreground rounded border border-border transition-colors"
+            className="px-2.5 py-1 text-xs font-medium bg-background hover:bg-accent text-foreground rounded-md border border-border transition-colors"
           >
             + {tpl.name}
           </button>
@@ -70,7 +70,7 @@ function SpeciesSection() {
       </div>
 
       {species.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic">点击上方按钮快速添加常见污染物，或点击 + 自定义添加。</p>
+        <EmptyState icon={FlaskConical} message="点击上方按钮快速添加常见污染物" />
       )}
 
       {species.map((sp) => (
@@ -125,9 +125,7 @@ function SourceSection() {
       </div>
 
       {sources.length === 0 && (
-        <p className="text-[10px] text-muted-foreground italic">
-          {species.length === 0 ? '请先添加污染物种类。' : '尚未添加源。点击 + 添加。'}
-        </p>
+        <EmptyState icon={Flame} message={species.length === 0 ? '请先添加污染物种类' : '尚未添加源'} />
       )}
 
       {sources.map((src, idx) => {

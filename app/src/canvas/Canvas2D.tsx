@@ -26,7 +26,7 @@ import {
   drawFlowArrows, drawPressureLabels, drawConcentrationHeatmap,
   drawBackgroundImage, drawWindPressureVectors,
   drawWallDimensions, drawZoneAreaLabels, drawCalibrationOverlay,
-  drawPlacementPreview, drawEraseHighlight,
+  drawPlacementPreview, drawEraseHighlight, drawEraseBox,
   drawGhostFloor,
   type ThemeColors,
   type EdgeFlowResult,
@@ -36,6 +36,7 @@ import {
 import {
   constrainOrthogonal, findNearestVertex,
   hitTest, computeAlphaOnEdge,
+  boxHitTestEdges, boxHitTestPlacements,
 } from './interaction';
 import { CanvasContextMenu } from './components/ContextMenu';
 import { FloorSwitcher } from './components/FloorSwitcher';
@@ -63,6 +64,11 @@ export default function Canvas2D() {
   // Rect tool state
   const rectStartRef = useRef<{ x: number; y: number } | null>(null);
   const rectEndRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Erase box-select state
+  const eraseBoxStartRef = useRef<{ x: number; y: number } | null>(null);
+  const eraseBoxEndRef = useRef<{ x: number; y: number } | null>(null);
+  const eraseBoxScreenStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Store selectors (fine-grained to avoid unnecessary re-renders)
   const toolMode = useCanvasStore(s => s.toolMode);
@@ -96,11 +102,11 @@ export default function Canvas2D() {
   }, [storeCameraZoom]);
 
   // ── Load background image ──
-  const activeStoryId = useCanvasStore(s => s.activeStoryId);
   const bgImageUrl = useCanvasStore(s => {
     const story = s.stories.find(st => st.id === s.activeStoryId);
     return story?.backgroundImage?.url ?? null;
   });
+  // Remove unused activeStoryId variable to fix noUnusedLocals error
   useEffect(() => {
     if (!bgImageUrl) {
       bgImageRef.current = null;
@@ -259,6 +265,14 @@ export default function Canvas2D() {
       } else if (state.hoveredEdgeId) {
         drawEraseHighlight(ctx, geo, story.placements, 'edge',
           state.hoveredEdgeId, camera, cssW, cssH);
+      }
+
+      // Erase box-select rectangle
+      if (eraseBoxStartRef.current && eraseBoxEndRef.current) {
+        drawEraseBox(ctx,
+          eraseBoxStartRef.current.x, eraseBoxStartRef.current.y,
+          eraseBoxEndRef.current.x, eraseBoxEndRef.current.y,
+          camera, cssW, cssH);
       }
     }
 
@@ -619,12 +633,10 @@ export default function Canvas2D() {
       }
 
       case 'erase': {
-        const hit = hitTest(geo, story.placements, wx, wy, cameraRef.current);
-        if (hit.type === 'placement' && hit.id) {
-          useCanvasStore.getState().removePlacement(hit.id);
-        } else if (hit.type === 'edge' && hit.id) {
-          useCanvasStore.getState().removeEdge(hit.id);
-        }
+        // Record start point for potential box-select drag
+        eraseBoxStartRef.current = { x: wx, y: wy };
+        eraseBoxEndRef.current = { x: wx, y: wy };
+        eraseBoxScreenStartRef.current = { x: e.clientX, y: e.clientY };
         break;
       }
     }
@@ -684,6 +696,11 @@ export default function Canvas2D() {
       useCanvasStore.getState().setSnapVertexId(sv?.id ?? null);
     }
 
+    // Erase box drag update
+    if (eraseBoxStartRef.current && state.toolMode === 'erase') {
+      eraseBoxEndRef.current = { x: wx, y: wy };
+    }
+
     // Hover detection (select mode and door/window/erase modes)
     if (['select', 'door', 'window', 'erase'].includes(state.toolMode)) {
       const hit = hitTest(geo, story.placements, wx, wy, cameraRef.current);
@@ -715,8 +732,64 @@ export default function Canvas2D() {
     dirtyRef.current = true;
   }, [toolMode, gridSize, snapToGridEnabled]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e: React.MouseEvent | MouseEvent) => {
     isPanningRef.current = false;
+
+    // Erase box-select release
+    if (eraseBoxStartRef.current && eraseBoxScreenStartRef.current) {
+      const state = useCanvasStore.getState();
+      if (state.toolMode === 'erase') {
+        const clientX = 'clientX' in e ? e.clientX : 0;
+        const clientY = 'clientY' in e ? e.clientY : 0;
+        const dx = clientX - eraseBoxScreenStartRef.current.x;
+        const dy = clientY - eraseBoxScreenStartRef.current.y;
+        const dragDist = Math.sqrt(dx * dx + dy * dy);
+
+        const story = state.stories.find(s => s.id === state.activeStoryId) ?? state.stories[0];
+        if (story) {
+          if (dragDist > 5) {
+            // Box-select delete
+            const geo = story.geometry;
+            const bx1 = eraseBoxStartRef.current.x;
+            const by1 = eraseBoxStartRef.current.y;
+            const bx2 = eraseBoxEndRef.current?.x ?? bx1;
+            const by2 = eraseBoxEndRef.current?.y ?? by1;
+
+            const hitPlIds = boxHitTestPlacements(geo, story.placements, bx1, by1, bx2, by2);
+            const hitEdgeIds = boxHitTestEdges(geo, bx1, by1, bx2, by2);
+
+            // Remove placements first, then edges in batch
+            for (const plId of hitPlIds) {
+              useCanvasStore.getState().removePlacement(plId);
+            }
+            if (hitEdgeIds.length > 0) {
+              useCanvasStore.getState().removeEdges(hitEdgeIds);
+            }
+          } else {
+            // Single-click delete (original behavior)
+            const { w, h } = getCanvasCSS();
+            const rect = canvasRef.current?.getBoundingClientRect();
+            if (rect) {
+              const clientX2 = 'clientX' in e ? e.clientX : 0;
+              const clientY2 = 'clientY' in e ? e.clientY : 0;
+              const sx = clientX2 - rect.left;
+              const sy = clientY2 - rect.top;
+              const { wx, wy } = screenToWorld(sx, sy, cameraRef.current, w, h);
+              const hit = hitTest(story.geometry, story.placements, wx, wy, cameraRef.current);
+              if (hit.type === 'placement' && hit.id) {
+                useCanvasStore.getState().removePlacement(hit.id);
+              } else if (hit.type === 'edge' && hit.id) {
+                useCanvasStore.getState().removeEdge(hit.id);
+              }
+            }
+          }
+        }
+      }
+      eraseBoxStartRef.current = null;
+      eraseBoxEndRef.current = null;
+      eraseBoxScreenStartRef.current = null;
+      dirtyRef.current = true;
+    }
   }, []);
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -758,6 +831,10 @@ export default function Canvas2D() {
           rectStartRef.current = null;
           rectEndRef.current = null;
         }
+        // Clear erase box on Escape
+        eraseBoxStartRef.current = null;
+        eraseBoxEndRef.current = null;
+        eraseBoxScreenStartRef.current = null;
         state.clearSelection();
         dirtyRef.current = true;
       }
@@ -802,7 +879,7 @@ export default function Canvas2D() {
       case 'pan': return 'grab';
       case 'wall': case 'rect': return 'crosshair';
       case 'door': case 'window': return 'copy';
-      case 'erase': return 'not-allowed';
+      case 'erase': return eraseBoxStartRef.current ? 'crosshair' : 'not-allowed';
       default: return 'default';
     }
   };

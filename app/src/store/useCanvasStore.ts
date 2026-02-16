@@ -107,6 +107,7 @@ export interface CanvasState extends SelectionState, HoverState {
   addWall: (x1: number, y1: number, x2: number, y2: number) => void;
   addRect: (x1: number, y1: number, x2: number, y2: number) => void;
   removeEdge: (edgeId: string) => void;
+  removeEdges: (edgeIds: string[]) => void;
   updateEdge: (edgeId: string, updates: Partial<Pick<import('../model/geometry').GeoEdge, 'wallHeight' | 'wallThickness' | 'isExterior'>>) => void;
   getActiveGeometry: () => Geometry;
   getActiveStory: () => Story;
@@ -193,7 +194,7 @@ function autoAssignZones(
       newAssignments.push({
         faceId: face.id,
         zoneId: nextId++,
-        name: `房间 ${newAssignments.length + 1}`,
+        name: '', // placeholder, will be renumbered below
         temperature: 293.15,
         volume: area * story.floorToCeilingHeight,
         color: ZONE_COLORS[newAssignments.length % ZONE_COLORS.length],
@@ -201,7 +202,12 @@ function autoAssignZones(
     }
   }
   const validFaceIds = new Set(geo.faces.map(f => f.id));
-  return newAssignments.filter(z => validFaceIds.has(z.faceId));
+  const filtered = newAssignments.filter(z => validFaceIds.has(z.faceId));
+  // Renumber room names sequentially
+  filtered.forEach((z, i) => {
+    z.name = `房间 ${i + 1}`;
+  });
+  return filtered;
 }
 
 export const useCanvasStore = create<CanvasState>()(temporal((set, get) => {
@@ -337,8 +343,8 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => {
 
     set({
       stories,
-      // Chain wall: start next wall from the end of the confirmed wall
-      wallPreview: { startX: wp.endX, startY: wp.endY, endX: wp.endX, endY: wp.endY, active: true },
+      // BUG-2: Do not chain — each wall is drawn independently
+      wallPreview: { startX: 0, startY: 0, endX: 0, endY: 0, active: false },
     });
   },
 
@@ -399,16 +405,44 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => {
     // Remove placements on deleted edge
     story.placements = story.placements.filter(p => p.edgeId !== edgeId);
 
-    // Clean up zone assignments
-    const validFaceIds = new Set(geo.faces.map(f => f.id));
-    story.zoneAssignments = story.zoneAssignments.filter(z => validFaceIds.has(z.faceId));
-
+    // BUG-3: Use autoAssignZones to properly handle merged faces
     story.geometry = geo;
+    story.zoneAssignments = autoAssignZones(geo, story, stories);
     stories[storyIdx] = story;
 
     return {
       stories,
       selectedEdgeId: state.selectedEdgeId === edgeId ? null : state.selectedEdgeId,
+    };
+  }),
+
+  // Batch remove edges (single undo step, single rebuildFaces)
+  removeEdges: (edgeIds) => set((state) => {
+    if (edgeIds.length === 0) return {};
+    const stories = [...state.stories];
+    const storyIdx = stories.findIndex(s => s.id === state.activeStoryId);
+    if (storyIdx === -1) return {};
+
+    const story = { ...stories[storyIdx] };
+    const geo = structuredClone(story.geometry);
+    const idSet = new Set(edgeIds);
+
+    // Remove all edges at once, then rebuild faces once
+    for (const edgeId of edgeIds) {
+      geoRemoveEdge(geo, edgeId);
+    }
+    rebuildFaces(geo);
+
+    // Remove placements on any deleted edge
+    story.placements = story.placements.filter(p => !idSet.has(p.edgeId));
+
+    story.geometry = geo;
+    story.zoneAssignments = autoAssignZones(geo, story, stories);
+    stories[storyIdx] = story;
+
+    return {
+      stories,
+      selectedEdgeId: state.selectedEdgeId && idSet.has(state.selectedEdgeId) ? null : state.selectedEdgeId,
     };
   }),
 
@@ -469,8 +503,12 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => {
   removeStory: (storyId) => set((state) => {
     if (state.stories.length <= 1) return {}; // keep at least one story
     const filtered = state.stories.filter(s => s.id !== storyId);
-    const newActive = state.activeStoryId === storyId ? filtered[0].id : state.activeStoryId;
-    return { stories: filtered, activeStoryId: newActive, selectedEdgeId: null, selectedFaceId: null, selectedPlacementId: null };
+    // Re-index levels sequentially after deletion
+    const reindexed = filtered
+      .sort((a, b) => a.level - b.level)
+      .map((s, i) => ({ ...s, level: i, name: `${i === 0 ? '首层' : `${i + 1}层`}` }));
+    const newActive = state.activeStoryId === storyId ? reindexed[0].id : state.activeStoryId;
+    return { stories: reindexed, activeStoryId: newActive, selectedEdgeId: null, selectedFaceId: null, selectedPlacementId: null };
   }),
   renameStory: (storyId, name) => set((state) => ({
     stories: state.stories.map(s => s.id === storyId ? { ...s, name } : s),

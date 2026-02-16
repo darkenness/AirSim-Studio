@@ -71,7 +71,7 @@ export default function StatusBar() {
   const rightInfo = `墙: ${wallCount}  区域: ${zoneCount}  |  ${activeStory?.name ?? '首层'} (${storyLevel}/${stories.length})`;
 
   return (
-    <footer className="h-6 bg-card border-t border-border grid grid-cols-3 items-center px-2.5 text-[11px] text-muted-foreground shrink-0 select-none">
+    <footer className="h-8 bg-card border-t border-border grid grid-cols-3 items-center px-4 text-[11px] text-muted-foreground shrink-0 select-none">
       <span className="truncate">{leftInfo}</span>
       <span className="text-center font-data text-[10px] tracking-tight">{centerInfo}</span>
       <span className="text-right truncate font-data text-[10px]">{rightInfo}</span>

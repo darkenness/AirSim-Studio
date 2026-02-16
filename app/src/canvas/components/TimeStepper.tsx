@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import { useCanvasStore } from '../../store/useCanvasStore';
 import { Button } from '../../components/ui/button';
@@ -15,13 +15,15 @@ export function TimeStepper() {
   const transientResult = useAppStore(s => s.transientResult);
   const appMode = useCanvasStore(s => s.appMode);
   const setAppMode = useCanvasStore(s => s.setAppMode);
-
   const currentStep = useCanvasStore(s => s.currentTransientStep);
   const setCurrentStep = useCanvasStore(s => s.setCurrentTransientStep);
+
+  // All hooks must be called before any early return
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Early return AFTER all hooks
   if (appMode !== 'results' || !transientResult) return null;
 
   const totalSteps = transientResult.timeSeries.length;
@@ -32,25 +34,24 @@ export function TimeStepper() {
   useEffect(() => {
     if (isPlaying && totalSteps > 0) {
       intervalRef.current = setInterval(() => {
-        setCurrentStep(prev => {
-          if (prev >= totalSteps - 1) {
-            setIsPlaying(false);
-            return prev;
-          }
-          return prev + 1;
-        });
+        const cur = useCanvasStore.getState().currentTransientStep;
+        if (cur >= totalSteps - 1) {
+          setIsPlaying(false);
+        } else {
+          setCurrentStep(cur + 1);
+        }
       }, 1000 / playbackSpeed);
     }
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [isPlaying, playbackSpeed, totalSteps]);
+  }, [isPlaying, playbackSpeed, totalSteps, setCurrentStep]);
 
-  const goFirst = useCallback(() => { setCurrentStep(0); setIsPlaying(false); }, []);
-  const goPrev = useCallback(() => setCurrentStep(s => Math.max(0, s - 1)), []);
-  const goNext = useCallback(() => setCurrentStep(s => Math.min(totalSteps - 1, s + 1)), [totalSteps]);
-  const goLast = useCallback(() => { setCurrentStep(totalSteps - 1); setIsPlaying(false); }, [totalSteps]);
-  const togglePlay = useCallback(() => setIsPlaying(p => !p), []);
+  const goFirst = useCallback(() => { setCurrentStep(0); setIsPlaying(false); }, [setCurrentStep]);
+  const goPrev = useCallback(() => { const c = useCanvasStore.getState().currentTransientStep; setCurrentStep(Math.max(0, c - 1)); }, [setCurrentStep]);
+  const goNext = useCallback(() => { const c = useCanvasStore.getState().currentTransientStep; setCurrentStep(Math.min(totalSteps - 1, c + 1)); }, [totalSteps, setCurrentStep]);
+  const goLast = useCallback(() => { setCurrentStep(totalSteps - 1); setIsPlaying(false); }, [totalSteps, setCurrentStep]);
+  const togglePlay = useCallback(() => setIsPlaying((p: boolean) => !p), []);
 
   const speeds = [0.5, 1, 2, 4];
 
@@ -101,7 +102,7 @@ export function TimeStepper() {
 
       {/* Speed selector */}
       <div className="flex items-center gap-0.5">
-        {speeds.map(s => (
+        {speeds.map((s: number) => (
           <button
             key={s}
             onClick={() => setPlaybackSpeed(s)}
