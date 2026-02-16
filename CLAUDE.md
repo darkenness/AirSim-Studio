@@ -22,11 +22,11 @@
 ```
 contam-next/
 ├── engine/                 # C++17 计算引擎
-│   ├── src/core/           # Node, Link, Network, Solver, ContaminantSolver, TransientSimulation
+│   ├── src/core/           # 19 个核心模块: Node, Link, Network, Solver, ContaminantSolver, TransientSimulation, Species, Schedule, WeekSchedule, ChemicalKinetics, AerosolDeposition, AxleyBLD, SuperFilter, SimpleAHS, Occupant, OneDZone, DuctNetwork, AdaptiveIntegrator, PcgSolver
 │   ├── src/elements/       # 16 种气流元件 (PowerLaw, Fan, Duct, Damper, Filter, TwoWayFlow, CheckValve, SelfRegVent, QuadraticElement, BackdraftDamper, SupplyDiffuser, ReturnGrille, ...)
-│   ├── src/control/        # Sensor, Controller (PI), Actuator, LogicNodes
+│   ├── src/control/        # Sensor, Controller (PI+死区+抗饱和), Actuator, 15 种 LogicNodes (AND/OR/NOT/XOR, Sum/Avg/Min/Max, Exp/Ln/Abs, Multiply/Divide, Integrator, MovingAverage)
 │   ├── src/io/             # JsonReader, JsonWriter, Hdf5Writer, WeatherReader, ContaminantReader, CvfReader, WpcReader, CbwReport, SqliteWriter, AchReport, CsmReport, ValReport, EbwReport, CexReport, LogReport, OneDOutput
-│   ├── test/               # 247+ GoogleTest 用例 (16 个测试文件)
+│   ├── test/               # 266 GoogleTest 用例 (16 个测试文件)
 │   └── python/             # pycontam pybind11 绑定
 ├── app/                    # React 前端
 │   ├── src/canvas/         # Canvas2D 渲染器 (Excalidraw 风格无限画布)
@@ -34,7 +34,7 @@ contam-next/
 │   │   ├── camera2d.ts     # 世界↔屏幕坐标变换, 缩放/平移
 │   │   ├── renderer.ts     # 纯渲染函数 (网格, 区域, 墙体, 顶点, 构件, 预览)
 │   │   ├── interaction.ts  # 正交约束, 顶点吸附, 命中测试
-│   │   └── components/     # FloatingStatusBox, FloorSwitcher, ZoomControls, TimeStepper, ContextMenu
+│   │   └── components/     # FloatingStatusBox, FloorSwitcher, ZoomControls, TimeStepper, ContextMenu, ScaleFactorControl, TracingImageControls, ToolModeIndicator
 │   ├── src/components/     # UI 组件
 │   │   ├── TopBar/         # 工具栏 (运行, 保存, 加载, 导出, 暗色模式)
 │   │   ├── VerticalToolbar/# 左侧工具栏 (选择, 墙体, 矩形, 门, 窗, 擦除)
@@ -42,17 +42,29 @@ contam-next/
 │   │   ├── ContaminantPanel/ # 污染物/物种配置
 │   │   ├── ControlPanel/   # 控制系统配置
 │   │   ├── ScheduleEditor/ # 时间表编辑器 (ECharts 可视化)
+│   │   ├── FilterPanel/    # 过滤器配置 (气体/UVGI/超级过滤器)
+│   │   ├── AHSPanel/       # 空调系统配置
+│   │   ├── WeatherPanel/   # 气象数据配置
 │   │   ├── OccupantPanel/  # 人员暴露配置
+│   │   ├── LibraryManager/ # 库管理器
 │   │   ├── ResultsView/    # 稳态结果展示
 │   │   ├── TransientChart/ # 瞬态浓度图表
 │   │   ├── ExposureReport/ # 暴露报告
-│   │   └── ui/             # shadcn/ui 基础组件
+│   │   ├── ScheduleGantt/  # 时间表甘特图
+│   │   ├── ModelSummary/   # 模型摘要
+│   │   ├── WelcomePage/    # 欢迎页面
+│   │   ├── StatusBar/      # 底部状态栏
+│   │   ├── ShortcutDialog/ # 快捷键帮助对话框
+│   │   └── ui/             # shadcn/ui 基础组件 (14 个 Radix 原语)
 │   ├── src/control/        # React Flow 控制流画布
 │   ├── src/store/          # Zustand stores (useCanvasStore, useAppStore)
 │   ├── src/model/          # geometry.ts (Vertex→Edge→Face), dataBridge.ts (画布→引擎 JSON)
 │   ├── src/tools/          # StateNode (预留的层级状态机)
-│   ├── src/types/          # TypeScript 类型定义
-│   └── src-tauri/          # Tauri Rust 后端 (run_engine IPC)
+│   ├── src/types/          # TypeScript 类型定义 (31 个 interface + 5 个 type)
+│   ├── src/hooks/          # 自定义 hooks (use-toast, useMergedRooms)
+│   ├── src/utils/          # 工具函数 (fileOps — Tauri 原生对话框 + 浏览器回退)
+│   ├── src/lib/            # 通用工具 (cn 类名合并)
+│   └── src-tauri/          # Tauri Rust 后端 (run_engine IPC, UUID 临时文件)
 ├── schemas/                # topology.schema.json
 ├── validation/             # 4 个验证案例
 └── docs/                   # 算法公式, 用户手册, 验证报告
@@ -71,7 +83,7 @@ cd app && npx tauri dev        # Tauri 桌面应用 (调用真实引擎)
 cd engine
 cmake -S . -B build -G "Visual Studio 16 2019" -A x64
 cmake --build build --config Release
-./build/Release/contam_tests.exe    # 运行 247+ 个测试
+./build/Release/contam_tests.exe    # 运行 266 个测试
 ./build/Release/contam_engine.exe -i ../validation/case01_3room/input.json -o output.json -v
 ```
 
@@ -85,8 +97,8 @@ cmake --build build --config Release
 - 命中测试优先级: Placement > Edge > Face
 
 ### 状态管理
-- `useCanvasStore`: 画布几何、工具模式、选择/悬停状态、楼层管理、背景图
-- `useAppStore`: 全局应用状态 (节点、链接、物种、源、时间表、人员、控制系统、仿真结果)
+- `useCanvasStore` (45 个 action): 画布几何、工具模式、选择/悬停状态、楼层管理 (CRUD+复制)、背景图、比例因子、相机控制、侧边栏
+- `useAppStore` (42 个 action): 全局应用状态 (节点、链接、物种、源、时间表、周计划、日类型、人员、控制系统、天气、AHS、过滤器、仿真结果)
 - 两个 store 都通过 zundo 支持 undo/redo
 
 ### 数据流
@@ -111,14 +123,12 @@ cmake --build build --config Release
 - Tauri 集成: run_engine IPC, externalBin 打包
 
 ### 待完成 — 集成缺口
-1. ~~**结果叠加层未接入**~~ — ✅ drawFlowArrows/drawConcentrationHeatmap/drawPressureLabels 已在 Canvas2D results mode 中接入
-2. ~~**背景图渲染未接入**~~ — ✅ Canvas2D L87-102 useEffect 加载 + L154-163 渲染步骤 0 调用 drawBackgroundImage
-3. ~~**风压矢量未接入**~~ — ✅ Canvas2D L342-360 results mode 中计算 Cp(θ) 并调用 drawWindPressureVectors
-4. ~~**文件对话框**~~ — ✅ fileOps.ts 已改用 Tauri 原生对话框 (@tauri-apps/plugin-dialog + plugin-fs)，浏览器回退到 input/a 标签
-5. **StateNode 未启用** — 层级状态机已编写但工具仍使用 switch(toolMode)
+1. **StateNode 未启用** — 层级状态机已编写但工具仍使用 switch(toolMode)
+
+> 注：结果叠加层、背景图渲染、风压矢量、文件对话框均已在 Phase 5/14R 中完成接入。
 
 ### 已完成 — Phase 4 + 4.5
-- ✅ 前端 170+ 个 Vitest 测试 (8 个测试文件: geometry, camera2d, interaction, useCanvasStore, useAppStore, dataBridge, dagValidation, fileOps)
+- ✅ 前端 266 个 Vitest 测试 (8 个测试文件: geometry, camera2d, interaction, useCanvasStore, useAppStore, dataBridge, dagValidation, fileOps)
 - ✅ 引擎 JSON 解析 (气象记录, AHS 系统, 人员)
 - ✅ DAG 环路检测 (控制流画布)
 - ✅ HDF5 输出 (稳态+瞬态, 物种/节点元数据)
@@ -304,9 +314,9 @@ cmake --build build --config Release
 
 ---
 
-## Phase 14R — Bug Fix 批量修复 (52 项)
+## Phase 14R — Bug Fix 批量修复 (68 项)
 
-> 基于 `bug-tracker.md` 审计结果，分 10 个 Phase 批量修复。
+> 基于 `bug-tracker.md` 审计结果，分 9 个 Phase 批量修复。全部已完成。
 
 ### Phase 1: dataBridge 核心修复 — ✅ 已完成
 | Bug | 修复内容 |
@@ -379,3 +389,49 @@ cmake --build build --config Release
 | ZoneAssignment | shaftGroupId, initialConcentrations |
 | Story | elevation |
 | CanvasState | addRect, removeStory, renameStory, duplicateStory |
+
+---
+
+## 项目统计概览 (2026-02-16)
+
+| 维度 | 数量 |
+|------|------|
+| C++ 引擎 .h/.cpp 文件 | 112 |
+| 气流元件种类 | 16 (PowerLaw, Fan, TwoWayFlow, Duct, Damper, Filter, CheckValve, SelfRegVent, Quadratic, BackdraftDamper, SupplyDiffuser, ReturnGrille, SimpleParticleFilter, SimpleGaseousFilter, UVGI, SuperFilter) |
+| 逻辑节点类型 | 15 (AND/OR/XOR/NOT, Sum/Avg/Min/Max, Exp/Ln/Abs, Multiply/Divide, Integrator, MovingAverage) |
+| 核心模块 (src/core/) | 19 |
+| I/O 模块 (src/io/) | 16 (3 读取器 + 3 写入器 + 10 报告类) |
+| 源类型 | 5 (Constant, ExponentialDecay, PressureDriven, CutoffConcentration, Burst) |
+| GoogleTest 用例 | 266 (16 个测试文件) |
+| 前端 .tsx/.ts 文件 | 78 |
+| Vitest 用例 | 266 (8 个测试文件) |
+| UI 组件目录 | 19 (含 14 个 shadcn/ui 基础组件) |
+| Canvas 子组件 | 8 |
+| React Flow 节点类型 | 5 (Sensor, PIController, Actuator, Math, Logic) |
+| Zustand store action | 87 (useCanvasStore 45 + useAppStore 42) |
+| TypeScript 类型定义 | 36 (31 interface + 5 type) |
+| 验证案例 | 4 |
+| Python 绑定导出类 | 30+ |
+| npm dependencies | 27 + 19 devDependencies |
+
+### 引擎测试分布
+
+| 测试文件 | 用例数 | 覆盖模块 |
+|---------|--------|---------|
+| test_elements.cpp | 71 | 16 种气流元件 |
+| test_advanced.cpp | 37 | ChemKinetics/SuperFilter/AxleyBLD/Aerosol/1D/Duct |
+| test_dataBridge.test.ts | 38 | 画布→引擎 JSON 转换 |
+| test_p1_features.cpp | 23 | CVF/DVF/WPC/过滤器 |
+| test_validation.cpp | 21 | 4 个验证案例 |
+| test_phase6.cpp | 16 | 外部数据驱动/报告 |
+| test_oned_output.cpp | 16 | 1D 二进制输出 |
+| test_contaminant.cpp | 14 | 污染物传输 |
+| test_control.cpp | 12 | 控制系统 |
+| test_log_report.cpp | 12 | 控制日志 |
+| test_ebw_report.cpp | 8 | 暴露记录 |
+| test_cex_report.cpp | 7 | 外渗追踪 |
+| test_powerlaw.cpp | 7 | 幂律孔口 |
+| test_network.cpp | 6 | 网络拓扑 |
+| test_solver.cpp | 6 | N-R 求解器 |
+| test_val_report.cpp | 6 | 加压测试 |
+| test_json.cpp | 4 | JSON I/O |

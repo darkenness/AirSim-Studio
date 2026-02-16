@@ -65,13 +65,15 @@ describe('interaction.ts', () => {
       expect(result.snappedVertexId).not.toBeNull();
     });
 
-    it('does not snap to vertex if not orthogonal', () => {
+    it('snaps to nearby vertex even if not orthogonal (M-08: vertex wins)', () => {
       const geo = createEmptyGeometry();
       // Create a vertex at (5, 3) — different X and Y from start
       addWall(geo, 5, 3, 8, 3);
       const result = constrainOrthogonal(0, 0, 4.9, 2.8, 0.1, geo, 0.5);
-      // Vertex at (5,3) is close but not orthogonal to (0,0)
-      expect(result.snappedVertexId).toBeNull();
+      // M-08: vertex snapping always wins over orthogonal constraint
+      expect(result.x).toBe(5);
+      expect(result.y).toBe(3);
+      expect(result.snappedVertexId).not.toBeNull();
     });
   });
 

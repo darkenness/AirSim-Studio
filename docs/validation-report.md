@@ -1,6 +1,6 @@
 # CONTAM-Next 验证报告
 
-> 版本 1.0 | 2026-02-14
+> 版本 2.0 | 2026-02-16
 
 ---
 
@@ -10,15 +10,23 @@
 
 | 测试文件 | 测试数 | 覆盖模块 |
 |----------|--------|---------|
-| test_powerlaw.cpp | 8 | PowerLawOrifice 元件 |
-| test_network.cpp | 5 | Node, Link, Network 数据结构 |
-| test_solver.cpp | 10 | N-R 求解器 (SUR + Trust Region) |
-| test_json.cpp | 6 | JSON I/O (读写) |
-| test_contaminant.cpp | 11 | 污染物传输 + 排程 + 瞬态仿真 |
-| test_elements.cpp | 43 | Fan/TwoWayFlow/Duct/Damper/Filter + 多项式Fan |
-| test_control.cpp | 10 | 控制系统 (增量式PI) + Occupant暴露 |
-| test_advanced.cpp | 37 | ChemKinetics/SuperFilter/AxleyBLD/Aerosol/SelfRegVent/CheckValve/RCM |
-| **总计** | **130** | |
+| test_elements.cpp | 71 | 16 种气流元件 (PowerLaw, Fan, TwoWayFlow, Duct, Damper, Filter, CheckValve, SelfRegVent, Quadratic, BackdraftDamper, SupplyDiffuser, ReturnGrille, SimpleParticleFilter, SimpleGaseousFilter, UVGI, SuperFilter) |
+| test_advanced.cpp | 37 | ChemKinetics, SuperFilter, AxleyBLD, Aerosol, 1D FVM, DuctNetwork |
+| test_p1_features.cpp | 23 | CVF/DVF 外部时序, WPC 风压, 高级过滤器 |
+| test_validation.cpp | 21 | 4 个验证案例 (3房间/CO₂源/风机管道/多物种) |
+| test_phase6.cpp | 16 | 外部数据驱动, 箱线图统计 |
+| test_oned_output.cpp | 16 | 1D 二进制输出 (RXR/RZF/RZM/RZ1) |
+| test_contaminant.cpp | 14 | 污染物传输 + 排程 + 瞬态仿真 |
+| test_control.cpp | 12 | 控制系统 (PI控制器+逻辑节点) + Occupant暴露 |
+| test_log_report.cpp | 12 | 控制节点日志 (.LOG) |
+| test_ebw_report.cpp | 8 | 乘员暴露记录 (.EBW) |
+| test_cex_report.cpp | 7 | 污染外渗追踪 (.CEX) |
+| test_powerlaw.cpp | 7 | PowerLawOrifice 元件 |
+| test_network.cpp | 6 | Node, Link, Network 数据结构 |
+| test_solver.cpp | 6 | N-R 求解器 (SUR + Trust Region) |
+| test_val_report.cpp | 6 | 建筑加压测试 (.VAL) |
+| test_json.cpp | 4 | JSON I/O (读写) |
+| **总计** | **266** | |
 
 ### 1.2 算法验证（对照需求文档）
 
@@ -108,6 +116,21 @@
 - 反向流量 = 0 ✅
 - 数值稳定性（反向微小导数） ✅
 
+### 3.7 QuadraticElement
+
+- 二次流量-压差关系 Q = C·√ΔP ✅
+- 零压差线性化连续性 ✅
+
+### 3.8 BackdraftDamper
+
+- 正向流量同 PowerLawOrifice ✅
+- 反向流量阻止 ✅
+
+### 3.9 SupplyDiffuser / ReturnGrille
+
+- 低阻力末端装置流量计算 ✅
+- 导数连续性 ✅
+
 ---
 
 ## 4. 高级模型验证
@@ -132,3 +155,16 @@
 
 - 沉积系数 = d × A_s ✅
 - 质量守恒 (沉积量 = d×A×C×dt) ✅
+
+### 4.5 报告输出验证
+
+| 报告类型 | 测试数 | 验证内容 |
+|---------|--------|---------|
+| AchReport (.ACH) | 含于 test_p1_features | 总/机械/渗透换气次数分项 |
+| CsmReport (.CSM) | 含于 test_p1_features | 时均/峰值浓度 + 外渗估算 |
+| CbwReport (.CBW) | 含于 test_phase6 | 日均/峰值/分位数统计 |
+| ValReport (.VAL) | 6 | 鼓风门 50Pa 泄漏量模拟 |
+| EbwReport (.EBW) | 8 | 个人呼吸道吸入量评估 |
+| CexReport (.CEX) | 7 | 逐开口溯源泄漏量 (基础/详细模式) |
+| LogReport (.LOG) | 12 | 控制变量流水记录 |
+| OneDOutput | 16 | RXR/RZF/RZM/RZ1 二进制格式 |

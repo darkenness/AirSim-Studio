@@ -240,7 +240,7 @@ export default function Canvas2D() {
     drawPlacements(ctx, geo, story.placements, camera, cssW, cssH,
       state.selectedPlacementId, colors);
 
-    // 5a. H-02: Placement preview (ghost icon on hovered edge in door/window mode)
+    // 5a. H-02: Placement preview (ghost icon on hovered edge in placement mode)
     if (['door', 'window'].includes(state.toolMode) && state.hoveredEdgeId) {
       const { wx: cwx, wy: cwy } = screenToWorld(
         cursorScreenRef.current.x, cursorScreenRef.current.y,
@@ -351,7 +351,7 @@ export default function Canvas2D() {
             drawPressureLabels(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
           }
           if (zoneConcs.length > 0) {
-            drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH);
+            drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH, 'concentration', colors);
           }
         }
       } else if (result) {
@@ -415,7 +415,7 @@ export default function Canvas2D() {
           drawPressureLabels(ctx, geo, edgeFlows, camera, cssW, cssH, colors);
         }
         if (zoneConcs.length > 0) {
-          drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH, 'pressure');
+          drawConcentrationHeatmap(ctx, geo, zoneConcs, camera, cssW, cssH, 'pressure', colors);
         }
 
         // Wind pressure vectors on exterior walls
@@ -675,11 +675,13 @@ export default function Canvas2D() {
       useCanvasStore.getState().setSnapVertexId(ortho.snappedVertexId);
     }
 
-    // Rect preview update
+    // Rect preview update (M-09: vertex snap > grid snap)
     if (rectStartRef.current && state.toolMode === 'rect') {
-      const rx = snapToGridEnabled ? snapToGrid(wx, gridSize) : wx;
-      const ry = snapToGridEnabled ? snapToGrid(wy, gridSize) : wy;
+      const sv = findNearestVertex(geo, wx, wy, snapThreshold);
+      const rx = sv ? sv.x : (snapToGridEnabled ? snapToGrid(wx, gridSize) : wx);
+      const ry = sv ? sv.y : (snapToGridEnabled ? snapToGrid(wy, gridSize) : wy);
       rectEndRef.current = { x: rx, y: ry };
+      useCanvasStore.getState().setSnapVertexId(sv?.id ?? null);
     }
 
     // Hover detection (select mode and door/window/erase modes)

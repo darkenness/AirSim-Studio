@@ -15,13 +15,13 @@ CLAUDE.md 中声称"已完成"的功能全部经代码验证确认存在且有�
 
 | 位置 | CLAUDE.md 当前值 | 实际值 | 说明 |
 |------|------------------|--------|------|
-| 项目结构 `src/elements/` | 13 种气流元件 | 16 种 | 缺 QuadraticElement, BackdraftDamper, SupplyDiffuser, ReturnGrille |
-| 项目结构 `test/` | 182+ GoogleTest 用例 (10 个测试文件) | 247+ 用例 (16 个测试文件) | 新增 test_phase6, test_log_report, test_oned_output, test_val_report, test_ebw_report, test_cex_report |
-| 已完成 - 引擎 | 13 种气流元件 | 16 种 | 同上 |
-| 已完成 - 引擎 | 4 种源类型 | 5 种 | BurstSource 已在 Phase 5 实现 |
-| 已完成 - 引擎 | 14 种逻辑节点 | 15 种 | 多了 MovingAverage |
-| 常用命令 | 运行 200+ 个测试 | 运行 247+ 个测试 | |
-| Phase 4+4.5 | 25 个 Vitest 测试 | 170+ 个 Vitest 测试 | 8 个测试文件覆盖几何/相机/交互/Store/dataBridge/DAG/文件操作 |
+| 项目结构 `src/elements/` | 16 种 ✅ 已修正 | 16 种 | 缺 QuadraticElement, BackdraftDamper, SupplyDiffuser, ReturnGrille |
+| 项目结构 `test/` | 266 (16 个文件) ✅ 已修正 | 266 (16 个测试文件) | 精确统计: test_elements 71, test_advanced 37, test_p1_features 23, test_validation 21 等 |
+| 已完成 - 引擎 | 16 种 ✅ 已修正 | 16 种 | 同上 |
+| 已完成 - 引擎 | 5 种 ✅ 已修正 | 5 种 | BurstSource 已在 Phase 5 实现 |
+| 已完成 - 引擎 | 15 种 ✅ 已修正 | 15 种 | 多了 MovingAverage |
+| 常用命令 | 运行 266 个测试 ✅ 已修正 | 运行 266 个测试 | |
+| Phase 4+4.5 | 266 个 ✅ 已修正 | 266 个 | 精确统计: useCanvasStore 71, geometry 53, dataBridge 38, interaction 35, camera2d 31, useAppStore 26, dagValidation 7, fileOps 5 |
 
 ---
 
@@ -128,3 +128,4 @@ CLAUDE.md 中声称"已完成"的功能全部经代码验证确认存在且有�
 11. Phase 6.2 前端中 F-08 标注为"部分实现"
 12. 新增 I/O 文件列表: ValReport, EbwReport, CexReport, LogReport, OneDOutput
 13. 新增引擎元件列表: QuadraticElement, BackdraftDamper, SupplyDiffuser, ReturnGrille
+14. 新增项目统计概览章节，包含精确的文件数、测试数、组件数等统计

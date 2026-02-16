@@ -38,15 +38,115 @@ export function readThemeColors(): ThemeColors {
   const s = getComputedStyle(document.documentElement);
   const get = (v: string) => s.getPropertyValue(v).trim();
   return {
-    foreground: `hsl(${get('--foreground')})`,
-    background: `hsl(${get('--background')})`,
-    primary: `hsl(${get('--primary')})`,
-    border: `hsl(${get('--border')})`,
-    muted: `hsl(${get('--muted')})`,
-    accent: `hsl(${get('--accent')})`,
-    destructive: `hsl(${get('--destructive')})`,
-    card: `hsl(${get('--card')})`,
+    foreground: get('--foreground'),
+    background: get('--background'),
+    primary: get('--primary'),
+    border: get('--border'),
+    muted: get('--muted'),
+    accent: get('--accent'),
+    destructive: get('--destructive'),
+    card: get('--card'),
   };
+}
+
+// ── Hand-drawn (Excalidraw-style) rendering helpers ──
+
+/** Simple seeded PRNG based on string hash — consistent wobble per element */
+function seedFromId(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) {
+    h = ((h << 5) - h + id.charCodeAt(i)) | 0;
+  }
+  return h;
+}
+
+function seededRandom(seed: number, index: number): number {
+  const x = Math.sin(seed * 9301 + index * 49297 + 233280) * 49297;
+  return x - Math.floor(x);
+}
+
+/** Amplitude of hand-drawn wobble in screen pixels */
+const ROUGH_AMP = 1.2;
+
+/**
+ * Draw a rough (hand-drawn) line from (x1,y1) to (x2,y2) in screen coords.
+ * Splits the segment into sub-segments with slight perpendicular offsets.
+ */
+function roughLine(
+  ctx: CanvasRenderingContext2D,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  seed: number,
+  amp: number = ROUGH_AMP,
+): void {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 2) {
+    ctx.lineTo(x2, y2);
+    return;
+  }
+  // Normal direction for perpendicular offsets
+  const nx = -dy / len;
+  const ny = dx / len;
+  const segments = Math.max(2, Math.ceil(len / 20));
+
+  ctx.moveTo(x1 + (seededRandom(seed, 0) - 0.5) * amp * 0.5,
+             y1 + (seededRandom(seed, 1) - 0.5) * amp * 0.5);
+  for (let i = 1; i <= segments; i++) {
+    const t = i / segments;
+    const px = x1 + dx * t;
+    const py = y1 + dy * t;
+    const offset = (seededRandom(seed, i * 2) - 0.5) * amp * 2;
+    // Last point snaps to endpoint
+    if (i === segments) {
+      ctx.lineTo(x2 + (seededRandom(seed, 99) - 0.5) * amp * 0.3,
+                 y2 + (seededRandom(seed, 100) - 0.5) * amp * 0.3);
+    } else {
+      ctx.lineTo(px + nx * offset, py + ny * offset);
+    }
+  }
+}
+
+/**
+ * Draw a rough polygon path (closed) from screen-space points.
+ */
+function roughPolygon(
+  ctx: CanvasRenderingContext2D,
+  points: { x: number; y: number }[],
+  seed: number,
+  amp: number = ROUGH_AMP,
+): void {
+  if (points.length < 2) return;
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 0; i < points.length; i++) {
+    const next = points[(i + 1) % points.length];
+    roughLine(ctx, points[i].x, points[i].y, next.x, next.y, seed + i * 7, amp);
+  }
+  ctx.closePath();
+}
+
+/**
+ * Draw a rough circle (approximated by polygon segments).
+ */
+function roughCircle(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number, r: number,
+  seed: number,
+  amp: number = ROUGH_AMP,
+): void {
+  const n = 12;
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const angle = (i / n) * Math.PI * 2;
+    const wobble = 1 + (seededRandom(seed, i) - 0.5) * (amp / r) * 0.5;
+    const px = cx + Math.cos(angle) * r * wobble;
+    const py = cy + Math.sin(angle) * r * wobble;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
 }
 
 // ── Dot Grid ──
@@ -137,13 +237,13 @@ export function drawZones(
     const verts = getFaceVertices(geo, face);
     if (verts.length < 3) continue;
 
-    ctx.beginPath();
-    const first = verts[0];
-    ctx.moveTo(first.x * camera.zoom + camera.panX + cx, first.y * camera.zoom + camera.panY + cy);
-    for (let i = 1; i < verts.length; i++) {
-      ctx.lineTo(verts[i].x * camera.zoom + camera.panX + cx, verts[i].y * camera.zoom + camera.panY + cy);
-    }
-    ctx.closePath();
+    // Convert to screen coords
+    const screenPts = verts.map(v => ({
+      x: v.x * camera.zoom + camera.panX + cx,
+      y: v.y * camera.zoom + camera.panY + cy,
+    }));
+
+    roughPolygon(ctx, screenPts, seedFromId(face.id));
 
     // Fill
     ctx.fillStyle = zone.color;
@@ -218,8 +318,7 @@ export function drawWalls(
     }
 
     ctx.beginPath();
-    ctx.moveTo(sx1, sy1);
-    ctx.lineTo(sx2, sy2);
+    roughLine(ctx, sx1, sy1, sx2, sy2, seedFromId(edge.id));
     ctx.stroke();
     ctx.globalAlpha = 1.0;
 
@@ -229,8 +328,7 @@ export function drawWalls(
       ctx.lineWidth = thickness + 1;
       ctx.globalAlpha = 0.15;
       ctx.beginPath();
-      ctx.moveTo(sx1, sy1);
-      ctx.lineTo(sx2, sy2);
+      roughLine(ctx, sx1, sy1, sx2, sy2, seedFromId(edge.id) + 1);
       ctx.stroke();
       ctx.globalAlpha = 1.0;
     }
@@ -258,8 +356,8 @@ export function drawVertices(
     const sy = v.y * camera.zoom + camera.panY + cy;
 
     const isSnapped = v.id === snapVertexId;
-    ctx.beginPath();
-    ctx.arc(sx, sy, isSnapped ? radius * 1.8 : radius, 0, Math.PI * 2);
+    const r = isSnapped ? radius * 1.8 : radius;
+    roughCircle(ctx, sx, sy, r, seedFromId(v.id));
     ctx.fillStyle = isSnapped ? colors.primary : colors.foreground;
     ctx.globalAlpha = isSnapped ? 0.9 : 0.4;
     ctx.fill();
@@ -423,16 +521,16 @@ function drawFanIcon(
   ctx.lineWidth = Math.max(1.5, size * 0.12);
 
   // Circle
-  ctx.beginPath();
-  ctx.arc(sx, sy, r, 0, Math.PI * 2);
+  roughCircle(ctx, sx, sy, r, seedFromId('fan'));
   ctx.stroke();
 
   // Fan blades (3 lines from center)
   for (let i = 0; i < 3; i++) {
     const angle = (i * Math.PI * 2) / 3 - Math.PI / 2;
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx + Math.cos(angle) * r * 0.8, sy + Math.sin(angle) * r * 0.8);
+    roughLine(ctx, sx, sy,
+      sx + Math.cos(angle) * r * 0.8, sy + Math.sin(angle) * r * 0.8,
+      seedFromId('fan') + i);
     ctx.stroke();
   }
 }
@@ -482,8 +580,7 @@ export function drawWallPreview(
   ctx.lineCap = 'round';
   ctx.globalAlpha = 0.7;
   ctx.beginPath();
-  ctx.moveTo(sx1, sy1);
-  ctx.lineTo(sx2, sy2);
+  roughLine(ctx, sx1, sy1, sx2, sy2, 42);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.globalAlpha = 1.0;
@@ -526,10 +623,15 @@ export function drawRectPreview(
   ctx.lineWidth = Math.max(2, WALL_THICKNESS_M * camera.zoom);
   ctx.lineCap = 'round';
   ctx.globalAlpha = 0.6;
-  ctx.strokeRect(
-    Math.min(sx1, sx2), Math.min(sy1, sy2),
-    Math.abs(sx2 - sx1), Math.abs(sy2 - sy1),
-  );
+  const rLeft = Math.min(sx1, sx2), rTop = Math.min(sy1, sy2);
+  const rRight = Math.max(sx1, sx2), rBottom = Math.max(sy1, sy2);
+  roughPolygon(ctx, [
+    { x: rLeft, y: rTop },
+    { x: rRight, y: rTop },
+    { x: rRight, y: rBottom },
+    { x: rLeft, y: rBottom },
+  ], 77);
+  ctx.stroke();
   ctx.setLineDash([]);
   ctx.globalAlpha = 1.0;
 
@@ -760,6 +862,7 @@ export function drawConcentrationHeatmap(
   camera: Camera2D,
   canvasW: number, canvasH: number,
   mode: 'concentration' | 'pressure' = 'concentration',
+  colors?: ThemeColors,
 ): void {
   if (zoneResults.length === 0) return;
   const cx = canvasW / 2;
@@ -801,7 +904,7 @@ export function drawConcentrationHeatmap(
       const csy = centroid.y * camera.zoom + camera.panY + cy;
       const fontSize = Math.max(9, Math.min(12, camera.zoom * 0.2));
       ctx.font = `bold ${fontSize}px 'JetBrains Mono', monospace`;
-      ctx.fillStyle = '#000';
+      ctx.fillStyle = colors?.foreground ?? '#000';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.globalAlpha = 0.8;
