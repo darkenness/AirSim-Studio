@@ -666,6 +666,7 @@ export const useCanvasStore = create<CanvasState>()(temporal((set, get) => {
       calibrationPoints: null,
     });
   },
-}; }), { limit: 100 }));
+  };
+}, { limit: 100 }));
 
 // activeStoryId is now initialized inline — no post-init patch needed

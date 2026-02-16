@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useCanvasStore } from '../store/useCanvasStore';
-import type { ToolMode, AppMode } from '../store/useCanvasStore';
+import type { ToolMode } from '../store/useCanvasStore';
 
 beforeEach(() => {
   useCanvasStore.getState().clearAll();
@@ -86,13 +86,16 @@ describe('useCanvasStore', () => {
       expect(wp.endX).toBe(0);
     });
 
-    it('confirmWall adds wall to geometry and resets preview', () => {
+    it('confirmWall adds wall to geometry and chains next wall', () => {
       s().startWallPreview(0, 0);
       s().updateWallPreview(5, 0);
       s().confirmWall();
 
       const wp = s().wallPreview;
-      expect(wp.active).toBe(false);
+      // Chain wall: preview stays active, starting from the end of the confirmed wall
+      expect(wp.active).toBe(true);
+      expect(wp.startX).toBe(5);
+      expect(wp.startY).toBe(0);
 
       const geo = s().getActiveGeometry();
       expect(geo.edges.length).toBeGreaterThanOrEqual(1);
@@ -451,6 +454,7 @@ describe('useCanvasStore', () => {
       s().setBackgroundImage(storyId, {
         url: 'test.png', opacity: 0.5,
         scalePixelsPerMeter: 100, offsetX: 10, offsetY: 20,
+        rotation: 0, locked: false,
       });
       const story = s().stories[0];
       expect(story.backgroundImage).toBeDefined();
@@ -463,6 +467,7 @@ describe('useCanvasStore', () => {
       s().setBackgroundImage(storyId, {
         url: 'test.png', opacity: 0.5,
         scalePixelsPerMeter: 100, offsetX: 0, offsetY: 0,
+        rotation: 0, locked: false,
       });
       s().setBackgroundImage(storyId, undefined);
       expect(s().stories[0].backgroundImage).toBeUndefined();

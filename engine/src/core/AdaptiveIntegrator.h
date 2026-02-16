@@ -18,7 +18,7 @@ public:
         Config() = default;
     };
 
-    AdaptiveIntegrator(int numStates, const Config& config = {});
+    AdaptiveIntegrator(int numStates, const Config& config = Config());
 
     // RHS function: dy/dt = f(t, y)
     using RhsFunc = std::function<void(double t, const std::vector<double>& y, std::vector<double>& dydt)>;
