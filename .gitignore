@@ -3,7 +3,7 @@ engine/build/
 engine/out/
 engine/cmake-build-*/
 
-# IDE
+# IDE & Local Configuration
 .vs/
 .vscode/
 *.suo
@@ -11,6 +11,11 @@ engine/cmake-build-*/
 *.sln
 *.vcxproj*
 .idea/
+.claude/
+.omc/
+
+# Internal docs
+docs/bug-*.md
 
 # Dependencies (fetched by CMake)
 engine/_deps/
@@ -23,5 +28,6 @@ Thumbs.db
 app/node_modules/
 app/dist/
 app/src-tauri/target/
+app/src-tauri/contam_engine-*.exe
 app/.env
 *.log

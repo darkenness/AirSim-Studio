@@ -55,17 +55,17 @@ export function ScaleFactorControl() {
 
   return (
     <div className="absolute bottom-2 left-2 z-10 select-none">
-      <div className="flex items-center gap-0 bg-card/90 backdrop-blur-sm border border-border rounded px-0.5 py-0.5 shadow-sm">
+      <div className="flex items-center gap-0.5 bg-card/90 backdrop-blur-sm border border-border rounded-lg px-1 py-1 shadow-sm">
         <Button
           variant="ghost"
           size="icon-sm"
-          className="h-6 w-6"
+          className="h-8 w-8"
           onClick={() => setOpen(!open)}
           title="比例尺设置"
         >
-          <Ruler size={12} />
+          <Ruler size={16} />
         </Button>
-        <span className="font-data text-[10px] text-muted-foreground px-1">
+        <span className="font-data text-xs text-muted-foreground px-1">
           {scaleFactor === 1 ? '1:1' : `x${scaleFactor}`}
         </span>
       </div>
@@ -79,7 +79,7 @@ export function ScaleFactorControl() {
             {PRESETS.map(p => (
               <button
                 key={p.value}
-                className={`text-[10px] px-1.5 py-0.5 rounded border ${
+                className={`text-xs px-2 py-1 rounded border ${
                   Math.abs(scaleFactor - p.value) < 1e-9
                     ? 'bg-primary text-primary-foreground border-primary'
                     : 'bg-background border-border text-muted-foreground hover:bg-accent'
@@ -97,60 +97,60 @@ export function ScaleFactorControl() {
               type="number"
               step="0.01"
               min="0.001"
-              className="w-20 h-6 text-[11px] px-1.5 bg-background border border-border rounded text-foreground font-mono"
+              className="w-20 h-8 text-xs px-2 bg-background border border-border rounded text-foreground font-mono"
               placeholder="自定义..."
               value={manualInput}
               onChange={e => setManualInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
             />
-            <Button variant="ghost" size="icon-sm" className="h-6 w-6 text-[10px]" onClick={handleManualSubmit}>
+            <Button variant="ghost" size="icon-sm" className="h-8 w-8 text-xs" onClick={handleManualSubmit}>
               OK
             </Button>
           </div>
 
           {/* Calibration */}
           <div className="border-t border-border pt-2 space-y-1">
-            <div className="text-[10px] text-muted-foreground">两点校准</div>
+            <div className="text-xs text-muted-foreground">两点校准</div>
             {!isCalibrating ? (
               <Button
                 variant="outline"
                 size="sm"
-                className="h-6 text-[10px] w-full gap-1"
+                className="h-8 text-xs w-full gap-1"
                 onClick={startCalibration}
               >
-                <Crosshair size={10} />
+                <Crosshair size={14} />
                 开始校准
               </Button>
             ) : hasTwoPoints && !isNaN(calibrationPoints[0].x) ? (
               <div className="space-y-1">
-                <div className="text-[10px] text-green-500">已选两点，输入实际距离:</div>
+                <div className="text-xs text-green-500">已选两点，输入实际距离:</div>
                 <div className="flex items-center gap-1">
                   <input
                     type="number"
                     step="0.01"
                     min="0.001"
-                    className="w-20 h-6 text-[11px] px-1.5 bg-background border border-border rounded text-foreground font-mono"
+                    className="w-20 h-8 text-xs px-2 bg-background border border-border rounded text-foreground font-mono"
                     placeholder="距离(m)"
                     value={calibDist}
                     onChange={e => setCalibDist(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleCalibrationApply()}
                     autoFocus
                   />
-                  <Button variant="ghost" size="icon-sm" className="h-6 text-[10px]" onClick={handleCalibrationApply}>
+                  <Button variant="ghost" size="icon-sm" className="h-8 text-xs" onClick={handleCalibrationApply}>
                     应用
                   </Button>
-                  <Button variant="ghost" size="icon-sm" className="h-6 text-[10px] text-destructive" onClick={cancelCalibration}>
+                  <Button variant="ghost" size="icon-sm" className="h-8 text-xs text-destructive" onClick={cancelCalibration}>
                     取消
                   </Button>
                 </div>
               </div>
             ) : (
               <div className="space-y-1">
-                <div className="text-[10px] text-amber-500">在画布上点击两个点...</div>
+                <div className="text-xs text-amber-500">在画布上点击两个点...</div>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 text-[10px] text-destructive"
+                  className="h-8 text-xs text-destructive"
                   onClick={cancelCalibration}
                 >
                   取消
@@ -159,7 +159,7 @@ export function ScaleFactorControl() {
             )}
           </div>
 
-          <div className="text-[9px] text-muted-foreground/60">
+          <div className="text-xs text-muted-foreground/60">
             当前: 1格 = {scaleFactor.toFixed(3)}m
           </div>
         </div>

@@ -185,7 +185,7 @@ export default function TopBar() {
         </div>
         <div className="flex flex-col leading-none">
           <span className="font-bold text-foreground text-sm tracking-tight">AirSim</span>
-          <span className="text-muted-foreground text-[10px] font-medium">Studio · 2D</span>
+          <span className="text-muted-foreground text-xs font-medium">Studio · 2D</span>
         </div>
       </div>
 
@@ -193,7 +193,7 @@ export default function TopBar() {
 
       {/* Run simulation */}
       <Button onClick={handleRun} disabled={isRunning} size="sm"
-        className="h-9 gap-1.5 px-4 text-xs font-semibold rounded-xl border-b-[3px] border-primary/50 active:border-b-0 active:translate-y-0.5 transition-all shadow-md"
+        className="h-9 gap-1.5 px-4 text-sm font-semibold rounded-xl border-b-[3px] border-primary/50 active:border-b-0 active:translate-y-0.5 transition-all shadow-md"
       >
         <Play size={15} fill="currentColor" />
         {isRunning ? '计算中...' : (isTransient ? '瞬态仿真' : '稳态求解')}
@@ -204,7 +204,7 @@ export default function TopBar() {
           <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: '100%' }} />
           </div>
-          <span className="text-[11px] font-data text-muted-foreground tabular-nums">{elapsed}s</span>
+          <span className="text-xs font-data text-muted-foreground tabular-nums">{elapsed}s</span>
         </div>
       )}
 
@@ -218,7 +218,7 @@ export default function TopBar() {
               <Undo2 size={18} />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="text-xs rounded-xl">撤销 <kbd className="ml-1 px-1 py-0.5 bg-muted rounded-lg text-[10px] font-data">Ctrl+Z</kbd></TooltipContent>
+          <TooltipContent side="bottom" className="text-xs rounded-xl">撤销 <kbd className="ml-1 px-1 py-0.5 bg-muted rounded-lg text-xs font-data">Ctrl+Z</kbd></TooltipContent>
         </Tooltip>
         <Tooltip delayDuration={200}>
           <TooltipTrigger asChild>

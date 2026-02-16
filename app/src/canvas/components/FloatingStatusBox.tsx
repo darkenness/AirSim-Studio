@@ -149,7 +149,7 @@ export function FloatingStatusBox() {
           {nodeResult && (
             <>
               <div className="border-t border-border my-1" />
-              <div className="font-medium text-foreground/80 text-[10px] uppercase tracking-wide">稳态结果</div>
+              <div className="font-medium text-foreground/80 text-xs uppercase tracking-wide">稳态结果</div>
               <div className="text-purple-400 font-mono">压力: {fmt(nodeResult.pressure)} Pa</div>
               <div className="text-blue-400 font-mono">温度: {fmt(nodeResult.temperature - 273.15, 1)}°C</div>
               <div className="text-cyan-400 font-mono">密度: {fmt(nodeResult.density, 4)} kg/m³</div>
@@ -163,7 +163,7 @@ export function FloatingStatusBox() {
           {zonePressure !== null && transientStep && (
             <>
               <div className="border-t border-border my-1" />
-              <div className="font-medium text-foreground/80 text-[10px] uppercase tracking-wide">
+              <div className="font-medium text-foreground/80 text-xs uppercase tracking-wide">
                 瞬态 t={fmt(transientStep.time, 1)}s
               </div>
               <div className="text-purple-400 font-mono">压力: {fmt(zonePressure)} Pa</div>
@@ -177,7 +177,7 @@ export function FloatingStatusBox() {
           {zoneConcentrations && zoneConcentrations.length > 0 && (
             <>
               <div className="border-t border-border my-1" />
-              <div className="font-medium text-foreground/80 text-[10px] uppercase tracking-wide">浓度</div>
+              <div className="font-medium text-foreground/80 text-xs uppercase tracking-wide">浓度</div>
               {zoneConcentrations.map((conc, si) => {
                 const sp = speciesList[si];
                 if (!sp) return null;
@@ -317,13 +317,13 @@ export function FloatingStatusBox() {
           {edgeLinkResults.length > 0 && (
             <>
               <div className="border-t border-border my-1" />
-              <div className="font-medium text-foreground/80 text-[10px] uppercase tracking-wide">
+              <div className="font-medium text-foreground/80 text-xs uppercase tracking-wide">
                 {transientStep ? `瞬态 t=${fmt(transientStep.time, 1)}s` : '稳态结果'}
               </div>
               {edgeLinkResults.map((lr, i) => (
                 <div key={i} className="space-y-0.5">
                   {edgeLinkResults.length > 1 && (
-                    <div className="text-muted-foreground text-[10px]">路径 {i + 1}</div>
+                    <div className="text-muted-foreground text-xs">路径 {i + 1}</div>
                   )}
                   <div className="text-blue-400 font-mono">
                     流量: {fmt(Math.abs(lr.massFlow), 4)} kg/s {flowDir(lr.massFlow)}
@@ -331,7 +331,7 @@ export function FloatingStatusBox() {
                   <div className="text-purple-400 font-mono">
                     压差: {fmt(lr.deltaP)} Pa
                   </div>
-                  <div className="text-muted-foreground font-mono text-[10px]">
+                  <div className="text-muted-foreground font-mono text-xs">
                     {lr.massFlow >= 0 ? `${lr.fromName} \u2192 ${lr.toName}` : `${lr.toName} \u2192 ${lr.fromName}`}
                   </div>
                   {lr.filterEfficiency !== null && lr.filterEfficiency !== undefined && (

@@ -26,7 +26,7 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex items-center justify-center whitespace-nowrap flex-shrink-0 rounded-xl px-3.5 py-1.5 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-[0_2px_0_rgba(0,0,0,0.1),0_4px_6px_-1px_rgba(0,0,0,0.1)] data-[state=active]:ring-1 data-[state=active]:ring-blue-600/20",
+      "inline-flex items-center justify-center whitespace-nowrap flex-shrink-0 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 text-slate-500 hover:text-slate-700 hover:bg-slate-200/50 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 data-[state=active]:bg-blue-500 data-[state=active]:text-white data-[state=active]:font-semibold data-[state=active]:shadow-[0_2px_0_rgba(0,0,0,0.1),0_4px_6px_-1px_rgba(0,0,0,0.1)] data-[state=active]:ring-1 data-[state=active]:ring-blue-600/20",
       className
     )}
     {...props}

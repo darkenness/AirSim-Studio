@@ -19,10 +19,10 @@ const PLACEMENT_TYPES: { type: PlacementToolType; label: string }[] = [
 ];
 
 const tools: { mode: ToolMode; icon: React.ReactNode; label: string; tip: string; shortcut: string }[] = [
-  { mode: 'select', icon: <MousePointer2 size={18} strokeWidth={2.2} />, label: '选择', tip: '选择/移动墙壁和区域', shortcut: '1' },
-  { mode: 'wall', icon: <PenLine size={18} strokeWidth={2.2} />, label: '画墙', tip: '点击两端画正交墙，围合自动生成房间', shortcut: '2' },
-  { mode: 'rect', icon: <Square size={18} strokeWidth={2.2} />, label: '矩形', tip: '点击两点绘制矩形房间（4面墙）', shortcut: '3' },
-  { mode: 'erase', icon: <Eraser size={18} strokeWidth={2.2} />, label: '删除', tip: '点击删除墙壁或组件', shortcut: '6' },
+  { mode: 'select', icon: <MousePointer2 size={20} strokeWidth={2.2} />, label: '选择', tip: '选择/移动墙壁和区域', shortcut: '1' },
+  { mode: 'wall', icon: <PenLine size={20} strokeWidth={2.2} />, label: '画墙', tip: '点击两端画正交墙，围合自动生成房间', shortcut: '2' },
+  { mode: 'rect', icon: <Square size={20} strokeWidth={2.2} />, label: '矩形', tip: '点击两点绘制矩形房间（4面墙）', shortcut: '3' },
+  { mode: 'erase', icon: <Eraser size={20} strokeWidth={2.2} />, label: '删除', tip: '点击删除墙壁或组件', shortcut: '6' },
 ];
 
 export default function VerticalToolbar() {
@@ -84,7 +84,7 @@ export default function VerticalToolbar() {
             </TooltipTrigger>
             <TooltipContent side="right" sideOffset={12} className="text-xs flex items-center gap-2 rounded-xl">
               <span>{t.tip}</span>
-              <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded-lg font-data">{t.shortcut}</kbd>
+              <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded-lg font-data">{t.shortcut}</kbd>
             </TooltipContent>
           </Tooltip>
         );
@@ -107,13 +107,13 @@ export default function VerticalToolbar() {
                   : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
               )}
             >
-              <DoorOpen size={18} strokeWidth={2.2} />
+              <DoorOpen size={20} strokeWidth={2.2} />
               <ChevronRight size={8} className="absolute right-0.5 bottom-0.5 opacity-50" />
             </button>
           </TooltipTrigger>
           <TooltipContent side="right" sideOffset={12} className="text-xs flex items-center gap-2 rounded-xl">
             <span>放置{activeLabel}（右键选择类型）</span>
-            <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded-lg font-data">4</kbd>
+            <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded-lg font-data">4</kbd>
           </TooltipContent>
         </Tooltip>
 
@@ -158,12 +158,12 @@ export default function VerticalToolbar() {
                 : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
             )}
           >
-            <Eraser size={18} strokeWidth={2.2} />
+            <Eraser size={20} strokeWidth={2.2} />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right" sideOffset={12} className="text-xs flex items-center gap-2 rounded-xl">
           <span>点击删除墙壁或组件</span>
-          <kbd className="px-1.5 py-0.5 text-[10px] bg-muted rounded-lg font-data">6</kbd>
+          <kbd className="px-1.5 py-0.5 text-xs bg-muted rounded-lg font-data">6</kbd>
         </TooltipContent>
       </Tooltip>
     </aside>

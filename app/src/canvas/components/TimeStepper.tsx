@@ -61,7 +61,7 @@ export function TimeStepper() {
       <Button
         variant="ghost"
         size="sm"
-        className="text-xs mr-2"
+        className="text-sm mr-2"
         onClick={() => setAppMode('edit')}
       >
         返回编辑
@@ -70,19 +70,19 @@ export function TimeStepper() {
       <div className="w-px h-6 bg-border" />
 
       {/* Playback controls */}
-      <Button variant="ghost" size="icon-sm" onClick={goFirst}><SkipBack size={14} /></Button>
-      <Button variant="ghost" size="icon-sm" onClick={goPrev}><ChevronLeft size={14} /></Button>
+      <Button variant="ghost" size="icon-sm" onClick={goFirst}><SkipBack size={16} /></Button>
+      <Button variant="ghost" size="icon-sm" onClick={goPrev}><ChevronLeft size={16} /></Button>
       <Button variant="ghost" size="icon-sm" onClick={togglePlay}>
-        {isPlaying ? <Pause size={14} /> : <Play size={14} />}
+        {isPlaying ? <Pause size={16} /> : <Play size={16} />}
       </Button>
-      <Button variant="ghost" size="icon-sm" onClick={goNext}><ChevronRight size={14} /></Button>
-      <Button variant="ghost" size="icon-sm" onClick={goLast}><SkipForward size={14} /></Button>
+      <Button variant="ghost" size="icon-sm" onClick={goNext}><ChevronRight size={16} /></Button>
+      <Button variant="ghost" size="icon-sm" onClick={goLast}><SkipForward size={16} /></Button>
 
       <div className="w-px h-6 bg-border" />
 
       {/* Time slider */}
       <div className="flex items-center gap-2 min-w-[200px]">
-        <span className="text-[10px] font-mono text-muted-foreground w-16 text-right">
+        <span className="text-xs font-mono text-muted-foreground w-16 text-right">
           {formatTime(currentTime)}
         </span>
         <input
@@ -93,7 +93,7 @@ export function TimeStepper() {
           onChange={(e) => setCurrentStep(parseInt(e.target.value))}
           className="flex-1 h-1 accent-primary cursor-pointer"
         />
-        <span className="text-[10px] font-mono text-muted-foreground w-16">
+        <span className="text-xs font-mono text-muted-foreground w-16">
           {formatTime(endTime)}
         </span>
       </div>
@@ -106,7 +106,7 @@ export function TimeStepper() {
           <button
             key={s}
             onClick={() => setPlaybackSpeed(s)}
-            className={`px-1.5 py-0.5 text-[10px] rounded ${
+            className={`px-2 py-1 text-xs rounded ${
               playbackSpeed === s
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:bg-accent'
@@ -118,7 +118,7 @@ export function TimeStepper() {
       </div>
 
       {/* Step info */}
-      <span className="text-[10px] text-muted-foreground ml-1">
+      <span className="text-xs text-muted-foreground ml-1">
         {currentStep + 1}/{totalSteps}
       </span>
     </div>

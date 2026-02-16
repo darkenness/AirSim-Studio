@@ -47,7 +47,7 @@ export function FloorSwitcher() {
       disabled={disabled}
       title={title}
       className={cn(
-        "w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-150",
+        "w-10 h-10 flex items-center justify-center rounded-xl transition-all duration-150",
         "hover:scale-110 active:scale-95 active:translate-y-0.5",
         "text-muted-foreground hover:text-foreground hover:bg-muted/50",
         "disabled:opacity-30 disabled:pointer-events-none",
@@ -73,7 +73,7 @@ export function FloorSwitcher() {
     >
       {iconBtn(
         () => { if (activeIdx < stories.length - 1) setActiveStory(stories[activeIdx + 1].id); },
-        <ChevronUp size={15} strokeWidth={2.2} />,
+        <ChevronUp size={18} strokeWidth={2.2} />,
         '上一层 (PageUp)',
         activeIdx >= stories.length - 1,
       )}
@@ -83,7 +83,7 @@ export function FloorSwitcher() {
           key={story.id}
           onClick={() => setActiveStory(story.id)}
           className={cn(
-            "w-8 h-8 text-[11px] font-bold rounded-xl flex items-center justify-center transition-all duration-150",
+            "w-10 h-10 text-xs font-bold rounded-xl flex items-center justify-center transition-all duration-150",
             "hover:scale-110 active:scale-95",
             story.id === activeStoryId
               ? 'bg-primary text-primary-foreground shadow-md border-b-[3px] border-primary/70'
@@ -97,18 +97,18 @@ export function FloorSwitcher() {
 
       {iconBtn(
         () => { if (activeIdx > 0) setActiveStory(stories[activeIdx - 1].id); },
-        <ChevronDown size={15} strokeWidth={2.2} />,
+        <ChevronDown size={18} strokeWidth={2.2} />,
         '下一层 (PageDown)',
         activeIdx <= 0,
       )}
 
       <div className="w-6 h-px bg-border/60 my-0.5" />
 
-      {iconBtn(() => addStory(), <Plus size={15} strokeWidth={2.2} />, '添加楼层')}
-      {iconBtn(() => duplicateStory(activeStoryId), <Copy size={14} strokeWidth={2.2} />, '复制当前楼层')}
+      {iconBtn(() => addStory(), <Plus size={18} strokeWidth={2.2} />, '添加楼层')}
+      {iconBtn(() => duplicateStory(activeStoryId), <Copy size={16} strokeWidth={2.2} />, '复制当前楼层')}
       {stories.length > 1 && iconBtn(
         () => removeStory(activeStoryId),
-        <Trash2 size={14} strokeWidth={2.2} />,
+        <Trash2 size={16} strokeWidth={2.2} />,
         '删除当前楼层',
         false,
         true,
@@ -116,7 +116,7 @@ export function FloorSwitcher() {
 
       <div className="w-6 h-px bg-border/60 my-0.5" />
 
-      {iconBtn(() => requestZoomToFit(), <Maximize size={14} strokeWidth={2.2} />, '缩放至适合')}
+      {iconBtn(() => requestZoomToFit(), <Maximize size={16} strokeWidth={2.2} />, '缩放至适合')}
     </div>
   );
 }

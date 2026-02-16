@@ -40,7 +40,7 @@ export function ZoneProperties() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <Box size={16} className="text-primary" />
-        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">区域 / 房间</span>
+        <span className="text-base font-semibold text-slate-800 dark:text-slate-200">区域 / 房间</span>
       </div>
 
       <InputField
@@ -108,7 +108,7 @@ export function EdgeProperties() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <div className="w-4 h-4 bg-muted-foreground rounded-sm" />
-        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">墙壁</span>
+        <span className="text-base font-semibold text-slate-800 dark:text-slate-200">墙壁</span>
         <button
           onClick={() => removeEdge(selectedEdgeId)}
           className="ml-auto p-1 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
@@ -117,43 +117,43 @@ export function EdgeProperties() {
         </button>
       </div>
 
-      <div className="px-2.5 py-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-lg text-[11px] text-slate-400 dark:text-slate-500 space-y-2.5">
+      <div className="px-3 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl text-xs text-slate-400 dark:text-slate-500 space-y-2.5">
         <div>长度: {length.toFixed(2)} m</div>
-        <div className="grid grid-cols-3 gap-x-3 items-center">
-          <span className="text-right">高度</span>
-          <div className="col-span-2 flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">高度</span>
+          <div className="flex items-center gap-1.5 w-[58%] shrink-0">
             <input
               type="number"
               step="0.1"
               min="0.1"
               value={edge.wallHeight}
               onChange={(e) => updateEdge(selectedEdgeId, { wallHeight: parseFloat(e.target.value) || 3.0 })}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full h-9 px-3 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
             />
-            <span className="shrink-0">m</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">m</span>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-x-3 items-center">
-          <span className="text-right">厚度</span>
-          <div className="col-span-2 flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">厚度</span>
+          <div className="flex items-center gap-1.5 w-[58%] shrink-0">
             <input
               type="number"
               step="0.01"
               min="0.01"
               value={edge.wallThickness}
               onChange={(e) => updateEdge(selectedEdgeId, { wallThickness: parseFloat(e.target.value) || 0.2 })}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full h-9 px-3 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
             />
-            <span className="shrink-0">m</span>
+            <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0">m</span>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-x-3 items-center">
-          <span className="text-right">类型</span>
-          <div className="col-span-2">
+        <div className="flex items-center justify-between gap-4 mb-1">
+          <span className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">类型</span>
+          <div className="w-[58%] shrink-0">
             <select
               value={edge.isExterior ? 'exterior' : 'interior'}
               onChange={(e) => updateEdge(selectedEdgeId, { isExterior: e.target.value === 'exterior' })}
-              className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+              className="w-full h-9 px-3 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
             >
               <option value="exterior">外墙（面向室外）</option>
               <option value="interior">内墙（共用墙）</option>
@@ -164,7 +164,7 @@ export function EdgeProperties() {
 
       {/* Connected zones info */}
       <div className="border-t border-slate-100 dark:border-slate-700/50 pt-2">
-        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
           相邻区域
         </span>
         {facesCount === 0 ? (
@@ -187,9 +187,9 @@ export function EdgeProperties() {
       {/* Placements on this edge */}
       {story.placements.filter(p => p.edgeId === selectedEdgeId).length > 0 && (
         <div className="border-t border-slate-100 dark:border-slate-700/50 pt-2">
-          <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            此墙上的组件（点击编辑参数）
-          </span>
+          <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          此墙上的组件（点击编辑参数）
+        </span>
           <div className="mt-1.5 space-y-1">
             {story.placements
               .filter(p => p.edgeId === selectedEdgeId)
@@ -239,7 +239,7 @@ export function PlacementProperties() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-2">
         <span className={`w-3 h-3 rounded-full shrink-0 ${placement.isConfigured ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`} />
-        <span className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+        <span className="text-base font-semibold text-slate-800 dark:text-slate-200">
           {PLACEMENT_LABELS[placement.type] || placement.type}
         </span>
         <button
@@ -282,14 +282,14 @@ export function PlacementProperties() {
 
       {/* Placement-specific parameters */}
       <div className="border-t border-slate-100 dark:border-slate-700/50 pt-2">
-        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+        <span className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
           气流元件参数
         </span>
       </div>
 
-      <div className="grid grid-cols-3 gap-x-3 items-center">
-        <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">元件类型</span>
-        <div className="col-span-2">
+      <div className="flex items-center justify-between gap-4 mb-1">
+        <span className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">元件类型</span>
+        <div className="w-[58%] shrink-0">
           <select
             value={placement.type}
             onChange={(e) => {
@@ -315,7 +315,7 @@ export function PlacementProperties() {
                 pMax: undefined,
               });
             }}
-            className="w-full px-2.5 py-1.5 text-xs border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-slate-800 transition-colors"
+            className="w-full h-9 px-3 text-sm border border-slate-200 dark:border-slate-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-white dark:bg-slate-800 transition-colors"
           >
           <option value="door">门</option>
           <option value="window">窗</option>
@@ -633,13 +633,13 @@ function ScheduleBinding({ placementId, scheduleId }: { placementId: string; sch
   ];
 
   return (
-    <div className="grid grid-cols-3 gap-x-3 items-center">
-      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider text-right">运行时间表</span>
-      <div className="col-span-2">
+    <div className="flex items-center justify-between gap-4 mb-1">
+      <span className="text-sm font-medium text-slate-600 dark:text-slate-400 shrink-0">运行时间表</span>
+      <div className="w-[58%] shrink-0">
         <select
           value={scheduleId ?? ''}
           onChange={(e) => updatePlacement(placementId, { scheduleId: e.target.value || undefined })}
-          className="w-full rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2.5 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
+          className="w-full h-9 px-3 text-sm border border-slate-200 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-800 text-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
         >
           <option value="">无（始终运行）</option>
           {allSchedules.map(s => (
@@ -660,7 +660,7 @@ export function StoryProperties() {
 
   return (
     <div className="flex flex-col gap-3">
-      <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-1">楼层设置</span>
+      <span className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-1">楼层设置</span>
       <InputField
         label="楼层名称"
         value={story.name}

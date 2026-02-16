@@ -167,12 +167,16 @@ double AdaptiveIntegrator::step(double t, double dtTarget, std::vector<double>& 
     dt = std::max(dt, config_.dtMin);
     dt = std::min(dt, config_.dtMax);
 
+    const int maxInternalSteps = 100000;
+    int internalSteps = 0;
+
     while (tCurrent < tEnd - 1e-14) {
         // Don't overshoot
         if (tCurrent + dt > tEnd) {
             dt = tEnd - tCurrent;
         }
         if (dt < config_.dtMin * 0.5) break;
+        if (++internalSteps > maxInternalSteps) break;
 
         int order;
         std::vector<double> ySolution;
@@ -188,15 +192,15 @@ double AdaptiveIntegrator::step(double t, double dtTarget, std::vector<double>& 
 
             double error = estimateError(y, ySolution, yBDF1);
 
-            if (error > 1.0) {
-                // Reject step
+            if (error > 1.0 && dt > config_.dtMin * 1.01) {
+                // Reject step, but only if we can still shrink
                 rejectedSteps_++;
                 dt = computeNewDt(dt, error, order);
                 dt = std::max(dt, config_.dtMin);
                 continue;
             }
 
-            // Accept step
+            // Accept step (or forced accept at dtMin)
             suggestedDt_ = computeNewDt(dt, error, order);
         } else {
             // BDF-1 only
@@ -211,7 +215,8 @@ double AdaptiveIntegrator::step(double t, double dtTarget, std::vector<double>& 
 
             double error = estimateError(y, ySolution, yDouble);
 
-            if (error > 1.0) {
+            if (error > 1.0 && dt > config_.dtMin * 1.01) {
+                // Reject step, but only if we can still shrink
                 rejectedSteps_++;
                 dt = computeNewDt(dt, error, order);
                 dt = std::max(dt, config_.dtMin);
